@@ -8,7 +8,7 @@ export DEBIAN_FRONTEND=noninteractive
 DEFAULT_QBEE_AGENT_VERSION="2023.26"
 
 URL_BASE="https://cdn.qbee.io/software/qbee-agent"
-# wget -O - -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/master/installer.sh
+# wget -O - -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/installer.sh | bash -s -- --bootstrap_key=<bootstrap_key>
 
 ## Handle Arguments
 usage() {
@@ -87,20 +87,28 @@ get_qbee_agent_url() {
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
     export QBEE_AGENT_URL="${URL_BASE}/qbee-agent_${QBEE_AGENT_VERSION}_${PACKAGE_ARCHITECTURE}.deb"
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    export QBEE_AGENT_URL="${URL_BASE}/qbee-agent-${QBEE_AGENT_VERSION}.${PACKAGE_ARCHITECTURE}-1.rpm"
+    export QBEE_AGENT_URL="${URL_BASE}/qbee-agent-${QBEE_AGENT_VERSION}-1.${PACKAGE_ARCHITECTURE}.rpm"
+  fi
+}
+
+install_wget() {
+  if [[ -z $(command -v wget) ]]; then
+     if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
+        apt-get update
+        apt-get install -y wget
+      elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
+        yum install -y wget
+      fi
   fi
 }
 
 # install the agent
 install_qbee_agent() {
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    apt-get update
-    apt-get install -y wget 
     wget -O /tmp/qbee-agent.deb ${QBEE_AGENT_URL}
     dpkg -i /tmp/qbee-agent.deb
     rm -f /tmp/qbee-agent.deb
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    yum install -y wget
     wget -O /tmp/qbee-agent.rpm ${QBEE_AGENT_URL}
     rpm -i /tmp/qbee-agent.rpm
     rm -f /tmp/qbee-agent.rpm
@@ -109,7 +117,6 @@ install_qbee_agent() {
 
 # bootstrap the agent
 bootstrap_agent() {
-
   if [[ -f /etc/qbee/qbee-agent.json ]]; then
     echo "Agent already bootstrapped, skipping."
     return
@@ -142,6 +149,7 @@ start_qbee_agent() {
 detect_package_manager
 find_package_architecture
 get_qbee_agent_url
+install_wget
 install_qbee_agent
 bootstrap_agent
 start_qbee_agent
