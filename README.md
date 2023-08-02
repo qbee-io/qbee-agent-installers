@@ -18,5 +18,6 @@ $ sudo bash /tmp/installer.sh --bootstrap_key=<bootstrap_key>
 Alternatively, you could run the installer as a oneliner:
 
 ```bash
-$ wget -O - -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/installer.sh | sudo bash -s -- --bootstrap_key=<bootstrap_key>
+$ wget -O - -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/installer.sh | \
+  sudo bash -s -- --bootstrap_key=<bootstrap_key>
 ```
