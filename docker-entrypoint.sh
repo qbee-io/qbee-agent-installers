@@ -49,7 +49,7 @@ generate_user_password() {
 }
 
 start_openssh() {
-  useradd -m qbeedemo
+  useradd -c "qbeedemo,,,,qbee demo user" -m -s /bin/bash qbeedemo
   echo "$DEMO_USER:$DEMO_PASSWORD" | chpasswd 
   # start sshd
   mkdir -p /run/sshd
