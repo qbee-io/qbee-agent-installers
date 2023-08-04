@@ -96,9 +96,9 @@ install_utils() {
   if [[ -z $(command -v wget) ]]; then
      if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
         apt-get update
-        apt-get install -y wget 
+        apt-get install -y wget iproute2 openssh-server
       elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-        yum install -y wget
+        yum install -y wget iproute openssh-server
       fi
   fi
 }

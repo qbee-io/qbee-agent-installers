@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+cleanup() {
+    echo "Caught signal, exiting qbee demo docker container..."
+    exit
+}
+
+trap cleanup INT TERM
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --qbee-agent-version)
@@ -28,24 +35,22 @@ detect_package_manager() {
 }
 
 install_utils() {
-  if [[ -z $(command -v wget) ]]; then
-     if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-        apt-get update
-        apt-get install -y wget openssh-server iproute2
-      elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-        yum install -y wget openssh-server iproute
-      fi
-  fi
+ if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
+    apt-get update
+    apt-get install -y wget openssh-server iproute2
+ elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
+    yum install -y wget openssh-server iproute
+ fi
 }
 
 generate_user_password() {
-  < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-16}
+  < /dev/urandom tr -dc A-Z-a-z-0-9 | head -c${1:-16}
   echo
 }
 
 start_openssh() {
   useradd -m qbeedemo
-  echo "qbeedemo:qbeedemo" | chpasswd 
+  echo "$DEMO_USER:$DEMO_PASSWORD" | chpasswd 
   # start sshd
   mkdir -p /run/sshd
   /usr/sbin/sshd 
@@ -56,6 +61,7 @@ install_qbee() {
     bash -s -- --bootstrap-key $BOOTSTRAP_KEY
 }
 
+DEMO_USER="qbeedemo"
 DEMO_PASSWORD=$(generate_user_password)
 
 detect_package_manager
