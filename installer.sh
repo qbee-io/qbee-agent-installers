@@ -19,13 +19,15 @@ usage() {
   printf " --bootstrap_key=<bootstrap_key>                           \\n"
 }
 
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
   case "$1" in
-    --qbee_agent_version=*)
-      QBEE_AGENT_VERSION="${1#*=}"
+    --qbee-agent-version)
+      shift
+      QBEE_AGENT_VERSION=$1
       ;;
-    --bootstrap_key=*)
-      BOOTSTRAP_KEY="${1#*=}"
+    --bootstrap-key)
+      shift
+      BOOTSTRAP_KEY=$1
       ;;
     *)
       exit 1
@@ -54,7 +56,6 @@ root_check() {
 }
 
 root_check
-##
 
 # determine the package manager
 detect_package_manager() {
@@ -85,17 +86,17 @@ get_qbee_agent_url() {
   fi
 
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    export QBEE_AGENT_URL="${URL_BASE}/qbee-agent_${QBEE_AGENT_VERSION}_${PACKAGE_ARCHITECTURE}.deb"
+    export QBEE_AGENT_PKG="qbee-agent_${QBEE_AGENT_VERSION}_${PACKAGE_ARCHITECTURE}.deb"
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    export QBEE_AGENT_URL="${URL_BASE}/qbee-agent-${QBEE_AGENT_VERSION}-1.${PACKAGE_ARCHITECTURE}.rpm"
+    export QBEE_AGENT_PKG="qbee-agent-${QBEE_AGENT_VERSION}-1.${PACKAGE_ARCHITECTURE}.rpm"
   fi
 }
 
-install_wget() {
+install_utils() {
   if [[ -z $(command -v wget) ]]; then
      if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
         apt-get update
-        apt-get install -y wget
+        apt-get install -y wget 
       elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
         yum install -y wget
       fi
@@ -104,15 +105,22 @@ install_wget() {
 
 # install the agent
 install_qbee_agent() {
+  local old_wd
+  old_wd=$(pwd)
+
+  DOWNLOAD_DIR=$(mktemp -d /tmp/qbee-agent-download.XXXXXXXX)
+  wget -P $DOWNLOAD_DIR ${URL_BASE}/${QBEE_AGENT_PKG}{,.sha512}
+
+  cd $DOWNLOAD_DIR
+  sha512sum -c ${QBEE_AGENT_PKG}.sha512 || exit 1
+
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    wget -O /tmp/qbee-agent.deb ${QBEE_AGENT_URL}
-    dpkg -i /tmp/qbee-agent.deb
-    rm -f /tmp/qbee-agent.deb
+    dpkg -i ${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    wget -O /tmp/qbee-agent.rpm ${QBEE_AGENT_URL}
-    rpm -i /tmp/qbee-agent.rpm
-    rm -f /tmp/qbee-agent.rpm
+    rpm -i ${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}
   fi
+  rm ${DOWNLOAD_DIR} -rf 
+  cd $old_wd
 }
 
 # bootstrap the agent
@@ -136,7 +144,7 @@ start_qbee_agent() {
     if [ "$init_comm" = "systemd" ]; then
       systemctl restart qbee-agent
     else
-      echo "Not running systemd, please restart the agent manually."
+      echo "Not running systemd, please start the agent manually."
       if [[ $QBEE_AGENT_VERSION =~ ^20.+$ ]]; then
         echo " $ qbee-agent start"
       else
@@ -149,9 +157,8 @@ start_qbee_agent() {
 detect_package_manager
 find_package_architecture
 get_qbee_agent_url
-install_wget
+install_utils
 install_qbee_agent
 bootstrap_agent
 start_qbee_agent
 
-echo 'Installation complete.'
