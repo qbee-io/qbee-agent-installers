@@ -26,6 +26,6 @@ You can also run the docker-entrypoint.sh for testing qbee features with a docke
 Container management does not work in docker mode out of the box)
 
 ```bash
-wget https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/installer.sh
+wget https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/docker-entrypoint.sh
 docker run -it -v $(pwd):/installer:ro --cap-add NET_ADMIN --device /dev/net/tun debian:latest bash /installer/docker-entrypoint.sh --bootstrap-key <bootstrap_key>
 ```
