@@ -26,17 +26,9 @@ exec_command() {
 
 trap cleanup INT TERM
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --bootstrap-key)
-      shift
-      BOOTSTRAP_KEY=$1
-      ;;
-    *)
-      exit 1
-  esac
-  shift
-done
+if [[ -z $QBEE_BOOTSTRAP_KEY ]]; then
+  echo "ERROR: No bootstrap key has been provided"
+fi
 
 detect_package_manager() {
   if [[ -n $(command -v dpkg) ]]; then
@@ -53,11 +45,11 @@ install_utils() {
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
     echo "Updating package cache"
     exec_command apt-get update
-    echo "Installing dependencies"
-    exec_command apt-get install -y wget openssh-server iproute2
+    echo "Installing utilities"
+    exec_command apt-get install -y wget openssh-server iproute2 sudo
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    echo "Installing dependencies"
-    exec_command yum install -y wget openssh-server iproute
+    echo "Installing utilities"
+    exec_command yum install -y wget openssh-server iproute sudo
   fi
 }
 
@@ -66,9 +58,15 @@ generate_user_password() {
   echo
 }
 
-start_openssh() {
-  useradd -c "qbeedemo,,,,qbee demo user" -m -s /bin/bash qbeedemo
+configure_user_access() {
+  # add user and password
+  useradd -c "$DEMO_USER,,,,qbee demo user" -m -s /bin/bash $DEMO_USER
   echo "$DEMO_USER:$DEMO_PASSWORD" | chpasswd 
+
+  # enable passwordless sudo
+  echo "$DEMO_USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/qbee
+  chmod 600 /etc/sudoers.d/qbee
+
   # start sshd
   mkdir -p /run/sshd
   /usr/sbin/sshd 
@@ -78,25 +76,23 @@ install_qbee() {
   local basedir
   basedir=$(cd "$(dirname ${0})" && pwd)
 
-  if [[ -f "$basedir/installer.sh" ]]; then
-    echo "Installing qbee-agent"
-    exec_command bash "$basedir/installer.sh" --bootstrap-key "$BOOTSTRAP_KEY"
-  else
-    install_script=$(mktemp /tmp/installer.sh.XXXXXXXX)
-    echo "Downloading install script"
-    exec_command wget -O "$install_script" -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/installer.sh
-    echo "Installing qbee-agent" 
-    exec_command bash "$install_script" --bootstrap-key "$BOOTSTRAP_KEY"
-    rm "$install_script" -f
-  fi
+  install_script=$(mktemp /tmp/qbee-agent-installer.sh.XXXXXXXX)
+  echo "Downloading install script"
+  exec_command wget -O "$install_script" -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/qbee-agent-installer.sh
+
+  # Utilities are already installed
+  export QBEE_SKIP_UTILITIES_INSTALL=1
+  echo "Installing and bootstrapping qbee-agent"
+  exec_command bash "$install_script" --bootstrap-key "$QBEE_BOOTSTRAP_KEY"
+  rm "$install_script" -f
 }
 
-DEMO_USER="qbeedemo"
+DEMO_USER="qbee"
 DEMO_PASSWORD=$(generate_user_password)
 
 detect_package_manager
 install_utils
-start_openssh
+configure_user_access
 install_qbee
 
 echo "****************************************************"
@@ -108,4 +104,5 @@ echo "*   password: $DEMO_PASSWORD                        "
 echo "****************************************************"
 
 # start qbee agent scheduler
-qbee-agent start
+qbee-agent start &
+wait $!

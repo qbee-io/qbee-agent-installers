@@ -6,6 +6,8 @@ export DEBIAN_FRONTEND=noninteractive
 
 ##
 DEFAULT_QBEE_AGENT_VERSION="2023.26"
+QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
+QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
 
 URL_BASE="https://cdn.qbee.io/software/qbee-agent"
 # wget -O - -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/installer.sh | bash -s -- --bootstrap_key=<bootstrap_key>
@@ -27,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --bootstrap-key)
       shift
-      BOOTSTRAP_KEY=$1
+      QBEE_BOOTSTRAP_KEY=$1
       ;;
     *)
       exit 1
@@ -37,7 +39,7 @@ done
 
 QBEE_AGENT_VERSION=${QBEE_AGENT_VERSION:-$DEFAULT_QBEE_AGENT_VERSION}
 
-if [[ -z $BOOTSTRAP_KEY ]]; then
+if [[ -z $QBEE_BOOTSTRAP_KEY ]]; then
   echo "ERROR: No bootstrap key provided, exiting."
   usage
   exit 1
@@ -129,9 +131,9 @@ bootstrap_agent() {
   fi
 
   if [[ $QBEE_AGENT_VERSION =~ ^20.+$ ]]; then
-    qbee-agent bootstrap -k "${BOOTSTRAP_KEY}"
+    qbee-agent bootstrap -k "${QBEE_BOOTSTRAP_KEY}" --device-hub-host "$QBEE_DEVICE_HUB_HOST" --vpn-server "$QBEE_DEVICE_VPN_SERVER"
   else
-    /opt/qbee/bin/qbee-bootstrap bootstrap -k "${BOOTSTRAP_KEY}"
+    /opt/qbee/bin/qbee-bootstrap bootstrap -k "${QBEE_BOOTSTRAP_KEY}"
   fi
 }
 
@@ -159,4 +161,3 @@ install_utils
 install_qbee_agent
 bootstrap_agent
 start_qbee_agent
-
