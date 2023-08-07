@@ -12,11 +12,11 @@ URL_BASE="https://cdn.qbee.io/software/qbee-agent"
 
 ## Handle Arguments
 usage() {
-  printf "Installer version: $QBEE_AGENT_VERSION                     \\n"   
-  printf "\\n"
-  printf "Valid Arguments are:                                       \\n"
-  printf " --qbee_agent_version=x.x.x                                \\n"
-  printf " --bootstrap_key=<bootstrap_key>                           \\n"
+  echo "Installer version: $QBEE_AGENT_VERSION                     "
+  echo
+  echo "Valid Arguments are:                                       "
+  echo " --qbee_agent_version=x.x.x                                "
+  echo " --bootstrap_key=<bootstrap_key>                           "
 }
 
 while [[ $# -gt 0 ]]; do
@@ -35,11 +35,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ -z $QBEE_AGENT_VERSION ]]; then
-  export QBEE_AGENT_VERSION="$DEFAULT_QBEE_AGENT_VERSION"
-else
-  export QBEE_AGENT_VERSION
-fi
+QBEE_AGENT_VERSION=${QBEE_AGENT_VERSION:-$DEFAULT_QBEE_AGENT_VERSION}
 
 if [[ -z $BOOTSTRAP_KEY ]]; then
   echo "ERROR: No bootstrap key provided, exiting."
@@ -60,9 +56,9 @@ root_check
 # determine the package manager
 detect_package_manager() {
   if [[ -n $(command -v dpkg) ]]; then
-    export PACKAGE_MANAGER="dpkg"
+    PACKAGE_MANAGER="dpkg"
   elif [[ -n $(command -v rpm) ]]; then
-    export PACKAGE_MANAGER="rpm"
+    PACKAGE_MANAGER="rpm"
   else
     echo "No supported package manager found, exiting."
     exit 1
@@ -72,9 +68,9 @@ detect_package_manager() {
 # determine the architecture
 find_package_architecture() {
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    export PACKAGE_ARCHITECTURE=$(dpkg --print-architecture)
+    PACKAGE_ARCHITECTURE=$(dpkg --print-architecture)
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    export PACKAGE_ARCHITECTURE=$(rpm --eval '%{_arch}')
+    PACKAGE_ARCHITECTURE=$(rpm --eval '%{_arch}')
   fi
 }
 
@@ -86,20 +82,18 @@ get_qbee_agent_url() {
   fi
 
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    export QBEE_AGENT_PKG="qbee-agent_${QBEE_AGENT_VERSION}_${PACKAGE_ARCHITECTURE}.deb"
+    QBEE_AGENT_PKG="qbee-agent_${QBEE_AGENT_VERSION}_${PACKAGE_ARCHITECTURE}.deb"
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    export QBEE_AGENT_PKG="qbee-agent-${QBEE_AGENT_VERSION}-1.${PACKAGE_ARCHITECTURE}.rpm"
+    QBEE_AGENT_PKG="qbee-agent-${QBEE_AGENT_VERSION}-1.${PACKAGE_ARCHITECTURE}.rpm"
   fi
 }
 
 install_utils() {
-  if [[ -z $(command -v wget) ]]; then
-     if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-        apt-get update
-        apt-get install -y wget iproute2 openssh-server
-      elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-        yum install -y wget iproute openssh-server
-      fi
+  if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
+    apt-get update
+    apt-get install -y wget iproute2 openssh-server
+  elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
+    yum install -y wget iproute openssh-server
   fi
 }
 
@@ -109,18 +103,18 @@ install_qbee_agent() {
   old_wd=$(pwd)
 
   DOWNLOAD_DIR=$(mktemp -d /tmp/qbee-agent-download.XXXXXXXX)
-  wget -P $DOWNLOAD_DIR ${URL_BASE}/${QBEE_AGENT_PKG}{,.sha512}
+  wget -P "$DOWNLOAD_DIR" "${URL_BASE}"/"${QBEE_AGENT_PKG}"{,.sha512}
 
-  cd $DOWNLOAD_DIR
-  sha512sum -c ${QBEE_AGENT_PKG}.sha512 || exit 1
+  cd "$DOWNLOAD_DIR"
+  sha512sum -c "${QBEE_AGENT_PKG}".sha512 || exit 1
 
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    dpkg -i ${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}
+    dpkg -i "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    rpm -i ${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}
+    rpm -i "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
   fi
-  rm ${DOWNLOAD_DIR} -rf 
-  cd $old_wd
+  rm "${DOWNLOAD_DIR}" -rf
+  cd "$old_wd"
 }
 
 # bootstrap the agent
@@ -131,9 +125,9 @@ bootstrap_agent() {
   fi
 
   if [[ $QBEE_AGENT_VERSION =~ ^20.+$ ]]; then
-    qbee-agent bootstrap -k ${BOOTSTRAP_KEY}
+    qbee-agent bootstrap -k "${BOOTSTRAP_KEY}"
   else
-    /opt/qbee/bin/qbee-bootstrap bootstrap -k ${BOOTSTRAP_KEY}
+    /opt/qbee/bin/qbee-bootstrap bootstrap -k "${BOOTSTRAP_KEY}"
   fi
 }
 

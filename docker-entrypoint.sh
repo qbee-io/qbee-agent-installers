@@ -1,18 +1,33 @@
 #!/usr/bin/env bash
 
+set -e
+export DEBIAN_FRONTEND=noninteractive
+
 cleanup() {
     echo "Caught signal, exiting qbee demo docker container..."
     exit
+}
+
+progress() {
+  local pid=$1
+  while kill -0 "$pid" 2>/dev/null; do
+    printf "."
+    sleep .5
+  done
+  wait "$pid" # capture exit code
+  printf "\n"
+  return $?
+}
+
+exec_command() {
+  ("$@" > /dev/null 2>&1) &
+  progress $!
 }
 
 trap cleanup INT TERM
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --qbee-agent-version)
-      shift
-      QBEE_AGENT_VERSION=$1
-      ;;
     --bootstrap-key)
       shift
       BOOTSTRAP_KEY=$1
@@ -25,9 +40,9 @@ done
 
 detect_package_manager() {
   if [[ -n $(command -v dpkg) ]]; then
-    export PACKAGE_MANAGER="dpkg"
+    PACKAGE_MANAGER="dpkg"
   elif [[ -n $(command -v rpm) ]]; then
-    export PACKAGE_MANAGER="rpm"
+    PACKAGE_MANAGER="rpm"
   else
     echo "No supported package manager found, exiting."
     exit 1
@@ -35,16 +50,19 @@ detect_package_manager() {
 }
 
 install_utils() {
- if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    apt-get update
-    apt-get install -y wget openssh-server iproute2
- elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    yum install -y wget openssh-server iproute
- fi
+  if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
+    echo "Updating package cache"
+    exec_command apt-get update
+    echo "Installing dependencies"
+    exec_command apt-get install -y wget openssh-server iproute2
+  elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
+    echo "Installing dependencies"
+    exec_command yum install -y wget openssh-server iproute
+  fi
 }
 
 generate_user_password() {
-  < /dev/urandom tr -dc A-Z-a-z-0-9 | head -c${1:-16}
+  < /dev/urandom tr -dc A-Z-a-z-0-9 | head -c 8
   echo
 }
 
@@ -57,8 +75,20 @@ start_openssh() {
 }
 
 install_qbee() {
-  wget -O - -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/installer.sh | \
-    bash -s -- --bootstrap-key $BOOTSTRAP_KEY
+  local basedir
+  basedir=$(cd "$(dirname ${0})" && pwd)
+
+  if [[ -f "$basedir/installer.sh" ]]; then
+    echo "Installing qbee-agent"
+    exec_command bash "$basedir/installer.sh" --bootstrap-key "$BOOTSTRAP_KEY"
+  else
+    install_script=$(mktemp /tmp/installer.sh.XXXXXXXX)
+    echo "Downloading install script"
+    exec_command wget -O "$install_script" -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/installer.sh
+    echo "Installing qbee-agent" 
+    exec_command bash "$install_script" --bootstrap-key "$BOOTSTRAP_KEY"
+    rm "$install_script" -f
+  fi
 }
 
 DEMO_USER="qbeedemo"
