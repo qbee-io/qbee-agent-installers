@@ -89,6 +89,10 @@ get_qbee_agent_url() {
 }
 
 install_utils() {
+  if [[ $QBEE_SKIP_UTILITIES_INSTALL -gt 0 ]]; then
+    return
+  fi
+
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
     apt-get update
     apt-get install -y wget iproute2 openssh-server
