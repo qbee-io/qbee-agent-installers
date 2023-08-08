@@ -13,8 +13,6 @@ URL_BASE="https://cdn.qbee.io/software/qbee-agent"
 
 ## Handle Arguments
 usage() {
-  echo "Installer version: $QBEE_AGENT_VERSION                     "
-  echo
   echo "Valid Arguments are:                                       "
   echo " --qbee_agent_version=x.x.x                                "
   echo " --bootstrap_key=<bootstrap_key>                           "
@@ -75,6 +73,12 @@ find_package_architecture() {
 
 # construct the agent url
 get_qbee_agent_url() {
+
+  if [[ -z $QBEE_AGENT_VERSION ]]; then
+    QBEE_AGENT_VERSION=$(wget -O - -q https://cdn.qbee.io/software/qbee-agent/latest.txt)
+    echo "Latest agent version is $QBEE_AGENT_VERSION"
+  fi
+
   # Check for which family of agent to install
   if [[ $QBEE_AGENT_VERSION =~ ^20.+$ ]]; then
     URL_BASE="${URL_BASE}/${QBEE_AGENT_VERSION}/packages"
@@ -97,13 +101,6 @@ install_utils() {
     apt-get install -y wget iproute2 openssh-server
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
     yum install -y wget iproute openssh-server
-  fi
-}
-
-determine_agent_version() {
-  if [[ -z $QBEE_AGENT_VERSION ]]; then
-    QBEE_AGENT_VERSION=$(wget -O - -q https://cdn.qbee.io/software/qbee-agent/latest.txt)
-    echo "Latest agent version is $QBEE_AGENT_VERSION"
   fi
 }
 
@@ -160,9 +157,8 @@ start_qbee_agent() {
 
 detect_package_manager
 find_package_architecture
-get_qbee_agent_url
 install_utils
-determine_agent_version
+get_qbee_agent_url
 install_qbee_agent
 bootstrap_agent
 start_qbee_agent
