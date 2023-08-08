@@ -5,7 +5,6 @@ set -e
 export DEBIAN_FRONTEND=noninteractive
 
 ##
-DEFAULT_QBEE_AGENT_VERSION="2023.26"
 QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
 QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
 
@@ -36,8 +35,6 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
-
-QBEE_AGENT_VERSION=${QBEE_AGENT_VERSION:-$DEFAULT_QBEE_AGENT_VERSION}
 
 if [[ -z $QBEE_BOOTSTRAP_KEY ]]; then
   echo "ERROR: No bootstrap key provided, exiting."
@@ -103,6 +100,13 @@ install_utils() {
   fi
 }
 
+determine_agent_version() {
+  if [[ -z $QBEE_AGENT_VERSION ]]; then
+    QBEE_AGENT_VERSION=$(wget -O - -q https://cdn.qbee.io/software/qbee-agent/latest.txt)
+    echo "Latest agent version is $QBEE_AGENT_VERSION"
+  fi
+}
+
 # install the agent
 install_qbee_agent() {
   local old_wd
@@ -158,6 +162,7 @@ detect_package_manager
 find_package_architecture
 get_qbee_agent_url
 install_utils
+determine_agent_version
 install_qbee_agent
 bootstrap_agent
 start_qbee_agent
