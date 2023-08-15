@@ -7,9 +7,9 @@ export DEBIAN_FRONTEND=noninteractive
 ##
 QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
 QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
+QBEE_DEVICE_SKIP_BOOTSTRAP=${QBEE_DEVICE_SKIP_BOOTSTRAP:-0}
 
 URL_BASE="https://cdn.qbee.io/software/qbee-agent"
-# wget -O - -q https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/installer.sh | bash -s -- --bootstrap_key=<bootstrap_key>
 
 ## Handle Arguments
 usage() {
@@ -79,10 +79,7 @@ get_qbee_agent_url() {
     echo "Latest agent version is $QBEE_AGENT_VERSION"
   fi
 
-  # Check for which family of agent to install
-  if [[ $QBEE_AGENT_VERSION =~ ^20.+$ ]]; then
-    URL_BASE="${URL_BASE}/${QBEE_AGENT_VERSION}/packages"
-  fi
+  URL_BASE="${URL_BASE}/${QBEE_AGENT_VERSION}/packages"
 
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
     QBEE_AGENT_PKG="qbee-agent_${QBEE_AGENT_VERSION}_${PACKAGE_ARCHITECTURE}.deb"
@@ -131,11 +128,7 @@ bootstrap_agent() {
     return
   fi
 
-  if [[ $QBEE_AGENT_VERSION =~ ^20.+$ ]]; then
-    qbee-agent bootstrap -k "${QBEE_BOOTSTRAP_KEY}" --device-hub-host "$QBEE_DEVICE_HUB_HOST" --vpn-server "$QBEE_DEVICE_VPN_SERVER"
-  else
-    /opt/qbee/bin/qbee-bootstrap bootstrap -k "${QBEE_BOOTSTRAP_KEY}"
-  fi
+  qbee-agent bootstrap -k "${QBEE_BOOTSTRAP_KEY}" --device-hub-host "$QBEE_DEVICE_HUB_HOST" --vpn-server "$QBEE_DEVICE_VPN_SERVER"
 }
 
 # restart the agent
@@ -146,11 +139,7 @@ start_qbee_agent() {
       systemctl restart qbee-agent
     else
       echo "Not running systemd, please start the agent manually."
-      if [[ $QBEE_AGENT_VERSION =~ ^20.+$ ]]; then
-        echo " $ qbee-agent start"
-      else
-        echo " $ /var/lib/qbee/bin/cf-execd -F"
-      fi
+      echo " $ qbee-agent start"
     fi
   fi
 }
@@ -160,5 +149,9 @@ find_package_architecture
 install_utils
 get_qbee_agent_url
 install_qbee_agent
+
+# skip bootstrap if env variable set
+[[ $QBEE_DEVICE_SKIP_BOOTSTRAP -gt 0 ]] && exit 0
+
 bootstrap_agent
 start_qbee_agent
