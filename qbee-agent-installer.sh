@@ -7,7 +7,6 @@ export DEBIAN_FRONTEND=noninteractive
 ##
 QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
 QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
-QBEE_DEVICE_SKIP_BOOTSTRAP=${QBEE_DEVICE_SKIP_BOOTSTRAP:-0}
 
 URL_BASE="https://cdn.qbee.io/software/qbee-agent"
 
@@ -35,9 +34,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z $QBEE_BOOTSTRAP_KEY ]]; then
-  echo "ERROR: No bootstrap key provided, exiting."
-  usage
-  exit 1
+  echo "WARNING: No bootstrap key provided, will only install"
 fi
 
 ## We only want to run as root
@@ -151,7 +148,7 @@ get_qbee_agent_url
 install_qbee_agent
 
 # skip bootstrap if env variable set
-[[ $QBEE_DEVICE_SKIP_BOOTSTRAP -gt 0 ]] && exit 0
+[[ -z $QBEE_BOOTSTRAP_KEY ]] && exit 0
 
 bootstrap_agent
 start_qbee_agent
