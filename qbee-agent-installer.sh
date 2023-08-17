@@ -4,13 +4,11 @@
 set -e
 export DEBIAN_FRONTEND=noninteractive
 
-##
 QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
 QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
 
 URL_BASE="https://cdn.qbee.io/software/qbee-agent"
 
-## Handle Arguments
 usage() {
   echo "Valid Arguments are:                                       "
   echo " --qbee_agent_version=x.x.x                                "
