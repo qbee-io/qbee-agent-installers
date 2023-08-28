@@ -102,10 +102,11 @@ install_qbee_agent() {
   old_wd=$(pwd)
 
   DOWNLOAD_DIR=$(mktemp -d /tmp/qbee-agent-download.XXXXXXXX)
-  wget -P "$DOWNLOAD_DIR" "${URL_BASE}"/"${QBEE_AGENT_PKG}"{,.sha512}
+  wget -P "$DOWNLOAD_DIR" "${URL_BASE}/${QBEE_AGENT_PKG}"
+  wget -P "$DOWNLOAD_DIR" "${URL_BASE}/SHA512SUMS"
 
   cd "$DOWNLOAD_DIR"
-  sha512sum -c "${QBEE_AGENT_PKG}".sha512 || exit 1
+  sha512sum --ignore-missing -c SHA512SUMS || exit 1
 
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
     dpkg -i "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
