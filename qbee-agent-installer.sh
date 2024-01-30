@@ -11,8 +11,9 @@ URL_BASE="https://cdn.qbee.io/software/qbee-agent"
 
 usage() {
   echo "Valid Arguments are:                                       "
-  echo " --qbee_agent_version=x.x.x                                "
-  echo " --bootstrap_key=<bootstrap_key>                           "
+  echo " --qbee-agent-version=x.x.x                                "
+  echo " --bootstrap-key=<bootstrap_key>                           "
+  echo " --help                                                    "
 }
 
 while [[ $# -gt 0 ]]; do
@@ -25,7 +26,14 @@ while [[ $# -gt 0 ]]; do
       shift
       QBEE_BOOTSTRAP_KEY=$1
       ;;
+    --help)
+      shift
+      usage
+      exit 0
+      ;;
     *)
+      echo "ERROR: Invalid option $1"
+      usage
       exit 1
   esac
   shift
