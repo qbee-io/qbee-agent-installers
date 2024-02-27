@@ -27,7 +27,7 @@ Container management does not work in docker mode out of the box)
 
 ```bash
 wget https://raw.githubusercontent.com/qbee-io/qbee-agent-installers/main/qbee-agent-entrypoint.sh
-docker run -v $(pwd):/entrypoint:ro --cap-add NET_ADMIN --device /dev/net/tun -e QBEE_BOOTSTRAP_KEY=<bootstrap_key> debian:latest bash /entrypoint/qbee-agent-entrypoint.sh
+docker run -v $(pwd):/entrypoint:ro -e QBEE_BOOTSTRAP_KEY=<bootstrap_key> debian:latest bash /entrypoint/qbee-agent-entrypoint.sh
 ```
 
 NB! Some features are not available in the docker mode (like Docker Container Management and Software Management) as they require that
