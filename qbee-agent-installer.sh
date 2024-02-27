@@ -8,11 +8,15 @@ QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
 QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
 
 URL_BASE="https://cdn.qbee.io/software/qbee-agent"
+REMOTE_ACCESS_VERSION="1"
 
 usage() {
-  echo "Valid Arguments are:                                       "
-  echo " --qbee_agent_version=x.x.x                                "
-  echo " --bootstrap_key=<bootstrap_key>                           "
+  echo "Installer for qbee-agent packages (versions 2023.XX and later)"
+  echo "Usage: qbee-agent-installer.sh [OPTIONS]                      "
+  echo "                                                              "
+  echo "Valid OPTIONS are:                                            "
+  echo " --bootstrap-key <bootstrap_key>                              "
+  echo " --qbee-agent-version <qbee_agent_version> (default: latest)  "
 }
 
 while [[ $# -gt 0 ]]; do
@@ -24,6 +28,10 @@ while [[ $# -gt 0 ]]; do
     --bootstrap-key)
       shift
       QBEE_BOOTSTRAP_KEY=$1
+      ;;
+    --help)
+      usage
+      exit 0
       ;;
     *)
       exit 1
@@ -66,13 +74,29 @@ find_package_architecture() {
   fi
 }
 
-# construct the agent url
-get_qbee_agent_url() {
-
+# resolve qbee agent version
+resolve_qbee_agent_version() {
   if [[ -z $QBEE_AGENT_VERSION ]]; then
     QBEE_AGENT_VERSION=$(wget -O - -q https://cdn.qbee.io/software/qbee-agent/latest.txt)
     echo "Latest agent version is $QBEE_AGENT_VERSION"
   fi
+
+  MAJOR_VERSION=$(echo "$QBEE_AGENT_VERSION" | cut -d. -f1)
+  MINOR_VERSION=$(echo "$QBEE_AGENT_VERSION" | cut -d. -f2 | sed 's/^0*//')
+
+  if [[ "$MAJOR_VERSION" -le 1 ]]; then
+    echo "Agent version $QBEE_AGENT_VERSION is not supported, exiting."
+    exit 1
+  fi
+
+  # Versions from 2024.09 and upwards have new remote access
+  if [[ "$MAJOR_VERSION" -ge 2024 && "$MINOR_VERSION" -ge 9 ]]; then
+    REMOTE_ACCESS_VERSION="2"
+  fi
+}
+
+# construct the agent url
+get_qbee_agent_url() {
 
   URL_BASE="${URL_BASE}/${QBEE_AGENT_VERSION}/packages"
 
@@ -83,16 +107,28 @@ get_qbee_agent_url() {
   fi
 }
 
-install_utils() {
-  if [[ $QBEE_SKIP_UTILITIES_INSTALL -gt 0 ]]; then
+# make sure we have wget so that we can download the agent
+install_wget () {
+  local wget_cmd
+  wget_cmd=$(command -v wget || true)
+  if [[ -n $wget_cmd ]]; then
     return
   fi
 
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
     apt-get update
-    apt-get install -y wget iproute2 openssh-server
+    apt-get install -y wget
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    yum install -y wget iproute openssh-server
+    yum install -y wget
+  fi
+}
+
+# install the utilities for remote access v1
+install_utils_remote_access_v1_utils() {
+  if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
+    apt-get install -y iproute2 openssh-server
+  elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
+    yum install -y iproute openssh-server
   fi
 }
 
@@ -124,7 +160,15 @@ bootstrap_agent() {
     return
   fi
 
-  qbee-agent bootstrap -k "${QBEE_BOOTSTRAP_KEY}" --device-hub-host "$QBEE_DEVICE_HUB_HOST" --vpn-server "$QBEE_DEVICE_VPN_SERVER"
+  EXTRA_OPTIONS=""
+
+  if [[ $REMOTE_ACCESS_VERSION -eq 1 ]]; then
+    EXTRA_OPTIONS="--vpn-server $QBEE_DEVICE_VPN_SERVER"
+  fi
+
+  # We allow word splitting here as theese are command line arguments
+  # shellcheck disable=SC2086
+  qbee-agent bootstrap -k "${QBEE_BOOTSTRAP_KEY}" --device-hub-host "$QBEE_DEVICE_HUB_HOST" $EXTRA_OPTIONS
 }
 
 # restart the agent
@@ -142,7 +186,13 @@ start_qbee_agent() {
 
 detect_package_manager
 find_package_architecture
-install_utils
+install_wget
+resolve_qbee_agent_version
+
+if [[ $REMOTE_ACCESS_VERSION -eq 1 ]]; then
+  install_utils_remote_access_v1_utils
+fi
+
 get_qbee_agent_url
 install_qbee_agent
 
