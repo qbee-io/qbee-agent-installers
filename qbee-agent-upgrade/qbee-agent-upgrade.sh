@@ -20,7 +20,7 @@
 # on debian and redhat compatible systems. Make sure to test this script on non-production 
 # systems first.
 #
-# NB: This script does not support upgrades/downgrades to versions before 2023.XX
+# NB: This script does not support downgrades
 #
 
 set -euo pipefail
@@ -29,6 +29,30 @@ if [[ ! -f "$1" ]]; then
   echo "ERROR: $1 does not exist, aborting..."
   exit 1
 fi
+
+check_system_utilities() {
+  if [[ ! -x "$(command -v mktemp)" ]]; then
+    echo "ERROR: mktemp is required to run this script"
+    exit 1
+  fi
+}
+
+check_agent_sanity() {
+  if [[ ! -f /etc/qbee/qbee-agent.json ]]; then
+    echo "ERROR: qbee-agent configuration file not found"
+    exit 1
+  fi
+
+  if [[ ! -f /etc/qbee/ppkeys/qbee.cert ]]; then
+    echo "ERROR: qbee-agent certificate not found"
+    exit 1
+  fi
+
+  if [[ ! -f /etc/qbee/ppkeys/qbee.key ]]; then
+    echo "ERROR: qbee-agent key not found"
+    exit 1
+  fi
+}
 
 check_package_name() {
   local pkg_name
@@ -74,9 +98,18 @@ check_package_version() {
   fi
 }
 
+check_dpkg_lock() {
+  if ls -lt /proc/[0-9]*/fd 2> /dev/null | grep -q /var/lib/dpkg/lock; then
+    echo "ERROR: Package manager is already running, unable to upgrade" 
+    exit 1
+  fi
+}
+
 sanity_deb() {
   local pkg
   pkg="$1"
+
+  check_dpkg_lock
 
   pkg_name=$(dpkg -I "$pkg" | awk '/^[ ]*Package:/{print $NF}')
 
@@ -113,76 +146,78 @@ sanity_rpm() {
   
 }
 
-upgrade_rpm() {
-  local pkg
-  pkg="$1"
+# resolve package manager
+dpkg_path=$(command -v dpkg || true)
+rpm_path=$(command -v rpm || true)
 
-  # Upgrade rpm without running scripts
-  rpm -Uvh --noscripts "$pkg"
-}
+check_system_utilities
 
-upgrade_deb() {
-  local pkg
-  pkg="$1"
+if [[ -n "${dpkg_path}" ]]; then
+  sanity_deb "$1"
+elif [[ -n "${rpm_path}" ]]; then
+  sanitiy_rpm "$1"
+else
+  echo "ERROR: package manager not supported"
+  exit 1
+fi
 
-  # Fix issues with existing package
-  rm -f /var/lib/dpkg/info/qbee-agent.prerm
+# Passed the sanity checking, we can now upgrade the package
+UPGRADE_SCRIPT=$(mktemp /tmp/qbee-agent-do-upgrade.XXXXXXXXX.sh)
+cat <<EOF > "${UPGRADE_SCRIPT}"
+#!/usr/bin/env bash
+set -ue
+EOF
 
-  # Unpack the new qbee-agent
-  dpkg --unpack "$pkg"
+if [[ -n "${dpkg_path}" ]]; then
 
-  # Fix any issues with new package
-  rm -f /var/lib/dpkg/info/qbee-agent.postinst
+  cat <<'EOF' >> "${UPGRADE_SCRIPT}"
+# Wait for dpkg lock to be released, there could be apt/dpkg processes running
+while ls -lt /proc/[0-9]*/fd 2> /dev/null | grep -q /var/lib/dpkg/lock; do
+  sleep 1
+done
 
-  # Configure new package
-  dpkg --configure qbee-agent
-}
+dpkg -i "$1"
+EOF
 
-post_upgrade(){
-  # Make sure that we have updated ca certs
-  cp -a /opt/qbee/share/ssl/ca.cert /etc/qbee/ppkeys
+elif [[ -n "${rpm_path}" ]]; then
+  cat <<'EOF' >> "${UPGRADE_SCRIPT}"
+rpm -Uvh "$1"
+EOF
 
-  # Restart qbee-agent in non-blocking mode if running systemd
-  if [[ -d /run/systemd/system ]]; then
-    systemctl --no-block stop qbee-agent
-    systemctl daemon-reload
-    systemctl --no-block restart qbee-agent
-  fi
-  # Make sure that qbee-agent is enabled on boot
-  systemctl enable qbee-agent
-}
+fi
 
-send_v1_logs() {
-  # Attempt to get the logs from v1
-  if [[ ! -d /var/lib/qbee/app_workdir/log ]]; then
-	  return
-  fi
-
+cat <<'EOF' >> "${UPGRADE_SCRIPT}"
+# Attempt to get the logs from v1
+if [[ -d /var/lib/qbee/app_workdir/log ]]; then
   # Get contents of any v1 logs and remove if they exist
   num_logs=$(find /var/lib/qbee/app_workdir/log -type f | wc -l)	
   if [[ $num_logs -gt 0 ]]; then
 	  cat /var/lib/qbee/app_workdir/log/policy_log-*.jsonl > /var/lib/qbee/app_workdir/reports.jsonl
 	  rm -f /var/lib/qbee/app_workdir/log/policy_log-*.jsonl 
   fi
-}
-
-# resolve package manager
-dpkg_path=$(command -v dpkg || true)
-rpm_path=$(command -v rpm || true)
-
-if [[ -n "${dpkg_path}" ]]; then
-  sanity_deb "$1"
-  upgrade_deb "$1"
-elif [[ -n "${rpm_path}" ]]; then
-  sanitiy_rpm "$1"
-  upgrade_rpm "$1"
-else
-  echo "ERROR: package manager not supported"
-  exit 1
 fi
 
-# Run post upgrade steps
-post_upgrade
+# Make sure we reload the systemd daemon
+systemctl daemon-reload
 
-# Fetch logs from agent v1 if there are any
-send_v1_logs
+# Make sure that qbee-agent is enabled on boot
+systemctl enable qbee-agent
+
+while ! systemctl -q is-active qbee-agent; do
+  systemctl restart qbee-agent
+  sleep 10
+done
+
+# remove the upgrade script
+rm "$0" -f
+
+# End of upgrade script
+EOF
+
+echo "Sanity check completed, starting upgrade procedure as background task"
+
+chmod +x "${UPGRADE_SCRIPT}"
+# Start the upgrade procedure itself in the background
+$UPGRADE_SCRIPT "$1" < /dev/null > /dev/null 2>&1 &
+
+exit 0
