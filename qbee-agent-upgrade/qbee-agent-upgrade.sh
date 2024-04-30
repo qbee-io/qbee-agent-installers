@@ -18,9 +18,10 @@
 
 # This is a helper script to be able to upgrade qbee-agent <= 2023.46 to newer versions
 # on debian and redhat compatible systems. Make sure to test this script on non-production 
-# systems first.
+# systems first. For upgrades from versions 2024.05 and later, please use the Software
+# Management configuration in the qbee.io web interface.
 #
-# NB: This script does not support downgrades
+# This script does not support downgrades
 #
 
 set -euo pipefail
@@ -105,6 +106,13 @@ check_dpkg_lock() {
   fi
 }
 
+check_yum_lock() {
+  if [[ -f /var/run/yum.pid ]]; then
+    echo "ERROR: Package manager is already running, unable to upgrade"
+    exit 1
+  fi
+}
+
 sanity_deb() {
   local pkg
   pkg="$1"
@@ -129,6 +137,8 @@ sanity_deb() {
 sanity_rpm() {
   local pkg
   pkg="$1"
+
+  check_yum_lock
 
   pkg_name=$(rpm --queryformat='%{name}\n' "$pkg")
 
@@ -181,6 +191,11 @@ EOF
 
 elif [[ -n "${rpm_path}" ]]; then
   cat <<'EOF' >> "${UPGRADE_SCRIPT}"
+# Wait for yum lock to be released, there could be yum processes running
+while [[ -f /var/run/yum.pid ]]; do
+  sleep 1
+done
+
 rpm -Uvh "$1"
 EOF
 
@@ -207,6 +222,10 @@ while ! systemctl -q is-active qbee-agent; do
   systemctl restart qbee-agent
   sleep 10
 done
+
+# Add a log entry to the reports.jsonl file
+printf '{"bundle":"file_distribution","bundle_commit_id":"NA","commit_id":"NA","labels":"file_distribution","sev":"INFO","text":"Agent upgrade completed","ts":%d}\n' $(date +%s) \
+  >> /var/lib/qbee/app_workdir/reports.jsonl
 
 # remove the upgrade script
 rm "$0" -f
