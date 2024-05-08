@@ -14,27 +14,3 @@ bash /path/to/qbee-agent-upgrade.sh /path/to/qbee-agent_2024.09_amd64.deb
 
 ## Example file distribution payload
 
-```
-{
-  "enabled": true,
-  "version": "v1",
-  "files": [
-    {
-      "templates": [
-        {
-          "source": "/qbee-agent-upgrade.sh",
-          "destination": "/tmp/qbee-agent-upgrade.sh",
-          "is_template": false
-        },
-        {
-          "source": "/qbee-agent_2024.09_amd64.deb",
-          "destination": "/tmp/qbee-agent.deb",
-          "is_template": false
-        }
-      ],
-      "command": "bash /tmp/qbee-agent-upgrade.sh /tmp/qbee-agent.deb"
-    }
-  ]
-}
-
-```

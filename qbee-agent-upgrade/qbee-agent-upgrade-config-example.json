@@ -1,0 +1,75 @@
+{
+  "enabled": true,
+  "extend": true,
+  "version": "v1",
+  "files": [
+    {
+      "label": "Upgrade qbee-agent amd64",
+      "templates": [
+        {
+          "source": "/qbee-agent-upgrade/qbee-agent-upgrade.sh",
+          "destination": "/tmp/qbee-agent-upgrade.sh",
+          "is_template": false
+        },
+        {
+          "source": "/qbee-agent-upgrade/qbee-agent_2024.19_amd64.deb",
+          "destination": "/tmp/qbee-agent.deb",
+          "is_template": false
+        }
+      ],
+      "command": "bash /tmp/qbee-agent-upgrade.sh /tmp/qbee-agent.deb",
+      "pre_condition": "dpkg -s qbee-agent | awk '/^Version:/{print $NF}' | grep -q 1.2.1 && dpkg --print-architecture | grep amd64"
+    },
+    {
+      "label": "Upgrade qbee-agent arm64",
+      "templates": [
+        {
+          "source": "/qbee-agent-upgrade/qbee-agent-upgrade.sh",
+          "destination": "/tmp/qbee-agent-upgrade.sh",
+          "is_template": false
+        },
+        {
+          "source": "/qbee-agent-upgrade/qbee-agent_2024.19_arm64.deb",
+          "destination": "/tmp/qbee-agent.deb",
+          "is_template": false
+        }
+      ],
+      "command": "bash /tmp/qbee-agent-upgrade.sh /tmp/qbee-agent.deb",
+      "pre_condition": "dpkg -s qbee-agent | awk '/^Version:/{print $NF}' | grep -q 1.2.1 && dpkg --print-architecture | grep arm64"
+    },
+    {
+      "label": "Upgrade qbee-agent armhf",
+      "templates": [
+        {
+          "source": "/qbee-agent-upgrade/qbee-agent-upgrade.sh",
+          "destination": "/tmp/qbee-agent-upgrade.sh",
+          "is_template": false
+        },
+        {
+          "source": "/qbee-agent-upgrade/qbee-agent_2024.19_armhf.deb",
+          "destination": "/tmp/qbee-agent.deb",
+          "is_template": false
+        }
+      ],
+      "command": "bash /tmp/qbee-agent-upgrade.sh /tmp/qbee-agent.deb",
+      "pre_condition": "dpkg -s qbee-agent | awk '/^Version:/{print $NF}' | grep -q 1.2.1 && dpkg --print-architecture | grep armhf"
+    },
+    {
+      "label": "Upgrade qbee-agent i386",
+      "templates": [
+        {
+          "source": "/qbee-agent-upgrade/qbee-agent-upgrade.sh",
+          "destination": "/tmp/qbee-agent-upgrade.sh",
+          "is_template": false
+        },
+        {
+          "source": "/qbee-agent-upgrade/qbee-agent_2024.19_i386.deb",
+          "destination": "/tmp/qbee-agent.deb",
+          "is_template": false
+        }
+      ],
+      "command": "bash /tmp/qbee-agent-upgrade.sh /tmp/qbee-agent.deb",
+      "pre_condition": "dpkg -s qbee-agent | awk '/^Version:/{print $NF}' | grep -q 1.2.1 && dpkg --print-architecture | grep i368"
+    }
+  ]
+}
