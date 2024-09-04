@@ -23,7 +23,7 @@ export DEBIAN_FRONTEND=noninteractive
 QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
 QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
 
-URL_BASE="https://cdn.qbee.io/software/qbee-agent"
+URL_BASE="https://github.com/qbee-io/qbee-agent/releases/download"
 REMOTE_ACCESS_VERSION="1"
 
 usage() {
@@ -95,7 +95,8 @@ find_package_architecture() {
 # resolve qbee agent version
 resolve_qbee_agent_version() {
   if [[ -z $QBEE_AGENT_VERSION ]]; then
-    QBEE_AGENT_VERSION=$(wget -O - -q https://cdn.qbee.io/software/qbee-agent/latest.txt)
+    QBEE_AGENT_VERSION=$(wget -O - -q https://api.github.com/repos/qbee-io/qbee-agent/releases/latest | \
+      sed -n 's/.*"tag_name"\:[ ]*"\([0-9]*\.[0-9]*\)".*/\1/p')
     echo "Latest agent version is $QBEE_AGENT_VERSION"
   fi
 
@@ -116,7 +117,7 @@ resolve_qbee_agent_version() {
 # construct the agent url
 get_qbee_agent_url() {
 
-  URL_BASE="${URL_BASE}/${QBEE_AGENT_VERSION}/packages"
+  URL_BASE="${URL_BASE}/${QBEE_AGENT_VERSION}"
 
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
     QBEE_AGENT_PKG="qbee-agent_${QBEE_AGENT_VERSION}_${PACKAGE_ARCHITECTURE}.deb"
@@ -157,15 +158,15 @@ install_qbee_agent() {
 
   DOWNLOAD_DIR=$(mktemp -d /tmp/qbee-agent-download.XXXXXXXX)
   wget -P "$DOWNLOAD_DIR" "${URL_BASE}/${QBEE_AGENT_PKG}"
-  wget -P "$DOWNLOAD_DIR" "${URL_BASE}/SHA512SUMS"
+  wget -P "$DOWNLOAD_DIR" "${URL_BASE}/qbee-agent-${QBEE_AGENT_VERSION}-SHA512SUMS"
 
   cd "$DOWNLOAD_DIR"
-  sha512sum --ignore-missing -c SHA512SUMS || exit 1
+  sha512sum --ignore-missing -c qbee-agent-${QBEE_AGENT_VERSION}-SHA512SUMS || exit 1
 
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
     dpkg -i "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    rpm -i "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
+    rpm -iv "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
   fi
   rm "${DOWNLOAD_DIR}" -rf
   cd "$old_wd"
