@@ -1,0 +1,36 @@
+name: installer-test
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test install Ubuntu
+        run: |
+          docker run --rm -v $(pwd):/app:ro -w /app ubuntu:latest bash qbee-agent-installer.sh
+
+      - name: Test install Debian
+        run: |
+          docker run --rm -v $(pwd):/app:ro -w /app debian:latest bash qbee-agent-installer.sh
+
+      - name: Test install RHEL
+        run: |
+          docker run --rm -v $(pwd):/app:ro -w /app registry.access.redhat.com/ubi9/ubi:latest bash qbee-agent-installer.sh
+
+      - name: Test install CentOS
+        run: |
+          docker run -d --name centos7 --rm -v $(pwd):/app:ro -w /app centos:7 sh -c "while true; do sleep 60; done"
+          
+          docker exec centos7 sh -c "sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/CentOS-*.repo"
+          docker exec centos7 sh -c "sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/CentOS-*.repo"
+          docker exec centos7 sh -c "sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/CentOS-*.repo"
+          docker exec centos7 bash qbee-agent-installer.sh
+
+          docker kill centos7
+
