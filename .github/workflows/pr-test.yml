@@ -27,9 +27,9 @@ jobs:
         run: |
           docker run -d --name centos7 --rm -v $(pwd):/app:ro -w /app centos:7 sh -c "while true; do sleep 60; done"
           
-          docker exec centos7 sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/CentOS-*.repo
-          docker exec centos7 sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/CentOS-*.repo
-          docker exec centos7 sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/CentOS-*.repo
+          docker exec centos7 sh -c "sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/CentOS-*.repo"
+          docker exec centos7 sh -c "sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/CentOS-*.repo"
+          docker exec centos7 sh -c "sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/CentOS-*.repo"
           docker exec centos7 bash qbee-agent-installer.sh
 
           docker kill centos7
