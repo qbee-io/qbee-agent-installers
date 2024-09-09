@@ -1,4 +1,4 @@
-name: platform-pr-tests
+name: installer-test
 on:
   pull_request:
   push:
