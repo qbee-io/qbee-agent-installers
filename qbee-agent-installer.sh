@@ -22,6 +22,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
 QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
+QBEE_DEVICE_CA_CERT=${QBEE_DEVICE_CA_CERT:-}
 
 URL_BASE="https://cdn.qbee.io/software/qbee-agent"
 REMOTE_ACCESS_VERSION="1"
@@ -33,6 +34,8 @@ usage() {
   echo "Valid OPTIONS are:                                            "
   echo " --bootstrap-key <bootstrap_key>                              "
   echo " --qbee-agent-version <qbee_agent_version> (default: latest)  "
+  echo " --ca <path_to_ca_cert> (optional)                            "
+  echo " --devicehub <devicehub> (optional)                           "
 }
 
 while [[ $# -gt 0 ]]; do
@@ -44,6 +47,14 @@ while [[ $# -gt 0 ]]; do
     --bootstrap-key)
       shift
       QBEE_BOOTSTRAP_KEY=$1
+      ;;
+    --ca)
+      shift
+      QBEE_DEVICE_CA_CERT=$1
+      ;;
+    --devicehub)
+      shift
+      QBEE_DEVICE_HUB_HOST=$1
       ;;
     --help)
       usage
@@ -166,7 +177,7 @@ install_qbee_agent() {
   if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
     dpkg -i "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
   elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    rpm -i "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
+    rpm -iU "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
   fi
   rm "${DOWNLOAD_DIR}" -rf
   cd "$old_wd"
@@ -185,6 +196,10 @@ bootstrap_agent() {
     EXTRA_OPTIONS="--vpn-server $QBEE_DEVICE_VPN_SERVER"
   fi
 
+  if [[ -n $QBEE_DEVICE_CA_CERT ]]; then
+    EXTRA_OPTIONS="$EXTRA_OPTIONS --ca $QBEE_DEVICE_CA_CERT"
+  fi
+
   # We allow word splitting here as theese are command line arguments
   # shellcheck disable=SC2086
   qbee-agent bootstrap -k "${QBEE_BOOTSTRAP_KEY}" --device-hub-host "$QBEE_DEVICE_HUB_HOST" $EXTRA_OPTIONS
@@ -195,7 +210,7 @@ start_qbee_agent() {
   if [ -f '/proc/1/comm' ]; then
     init_comm=$(cat /proc/1/comm)
     if [ "$init_comm" = "systemd" ]; then
-      systemctl restart qbee-agent
+      systemctl --no-block restart qbee-agent
     else
       echo "Not running systemd, please start the agent manually."
       echo " $ qbee-agent start"
