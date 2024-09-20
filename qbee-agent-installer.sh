@@ -21,6 +21,7 @@ set -e
 export DEBIAN_FRONTEND=noninteractive
 
 QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
+QBEE_DEVICE_HUB_PORT=${QBEE_DEVICE_HUB_PORT:-}
 QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
 QBEE_DEVICE_CA_CERT=${QBEE_DEVICE_CA_CERT:-}
 
@@ -35,7 +36,8 @@ usage() {
   echo " --bootstrap-key <bootstrap_key>                              "
   echo " --qbee-agent-version <qbee_agent_version> (default: latest)  "
   echo " --ca <path_to_ca_cert> (optional)                            "
-  echo " --devicehub <devicehub> (optional)                           "
+  echo " --device-hub-host <device_hub_host> (optional)               "
+  echo " --device-hub-port <device_hub_port> (optional)               "
 }
 
 while [[ $# -gt 0 ]]; do
@@ -52,9 +54,13 @@ while [[ $# -gt 0 ]]; do
       shift
       QBEE_DEVICE_CA_CERT=$1
       ;;
-    --devicehub)
+    --device-hub-host)
       shift
       QBEE_DEVICE_HUB_HOST=$1
+      ;;
+    --device-hub-port)
+      shift
+      QBEE_DEVICE_HUB_PORT=$1
       ;;
     --help)
       usage
@@ -198,6 +204,10 @@ bootstrap_agent() {
 
   if [[ -n $QBEE_DEVICE_CA_CERT ]]; then
     EXTRA_OPTIONS="$EXTRA_OPTIONS --ca $QBEE_DEVICE_CA_CERT"
+  fi
+
+  if [[ -n $QBEE_DEVICE_HUB_PORT ]]; then
+    EXTRA_OPTIONS="$EXTRA_OPTIONS --device-hub-port $QBEE_DEVICE_HUB_PORT"
   fi
 
   # We allow word splitting here as theese are command line arguments
