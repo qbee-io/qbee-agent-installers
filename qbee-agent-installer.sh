@@ -35,7 +35,7 @@ usage() {
   echo "Valid OPTIONS are:                                            "
   echo " --bootstrap-key <bootstrap_key>                              "
   echo " --qbee-agent-version <qbee_agent_version> (default: latest)  "
-  echo " --ca <path_to_ca_cert> (optional)                            "
+  echo " --ca-cert <path_to_ca_cert> (optional)                            "
   echo " --device-hub-host <device_hub_host> (optional)               "
   echo " --device-hub-port <device_hub_port> (optional)               "
 }
@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
       shift
       QBEE_BOOTSTRAP_KEY=$1
       ;;
-    --ca)
+    --ca-cert)
       shift
       QBEE_DEVICE_CA_CERT=$1
       ;;
@@ -203,7 +203,7 @@ bootstrap_agent() {
   fi
 
   if [[ -n $QBEE_DEVICE_CA_CERT ]]; then
-    EXTRA_OPTIONS="$EXTRA_OPTIONS --ca $QBEE_DEVICE_CA_CERT"
+    EXTRA_OPTIONS="$EXTRA_OPTIONS --ca-cert $QBEE_DEVICE_CA_CERT"
   fi
 
   if [[ -n $QBEE_DEVICE_HUB_PORT ]]; then
