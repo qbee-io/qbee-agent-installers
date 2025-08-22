@@ -109,7 +109,7 @@ elif [[ -n $(command -v rpm) ]]; then
 
   PACKAGE_ARCHITECTURE=$(rpm --eval '%{_arch}')
   case $PACKAGE_ARCHITECTURE in
-    x86_64|aarch64|armv7hl|mips64el|riscv64|riscv64) info "Detected architecture: $PACKAGE_ARCHITECTURE" ;;
+    x86_64|aarch64|armv7hl|mips64el|riscv64) info "Detected architecture: $PACKAGE_ARCHITECTURE" ;;
     *) die "Unsupported architecture: $PACKAGE_ARCHITECTURE" ;;
   esac
 
