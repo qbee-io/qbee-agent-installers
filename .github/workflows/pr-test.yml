@@ -39,10 +39,12 @@ jobs:
       - name: Test install CentOS
         run: |
           docker run -d --name centos7 --rm -v $(pwd):/app:ro -w /app centos:7 sleep 60
+          
           docker exec centos7 sh -c "sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/CentOS-*.repo"
           docker exec centos7 sh -c "sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/CentOS-*.repo"
           docker exec centos7 sh -c "sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/CentOS-*.repo"
           docker exec centos7 bash qbee-agent-installer.sh
+
           docker kill centos7
 
   test-arm64:
@@ -53,30 +55,34 @@ jobs:
 
       - name: Test install Ubuntu
         run: |
-          docker run -d --name ubuntu-arm --rm -v $(pwd):/app:ro -w /app ubuntu:latest sleep 60
-          docker exec ubuntu-arm apt-get update && apt-get install -y wget
-          docker exec ubuntu-arm bash qbee-agent-installer.sh
-          docker kill ubuntu-arm
+          docker run -d --name ubuntu --rm -v $(pwd):/app:ro -w /app ubuntu:latest sleep 60
+          docker exec ubuntu apt-get update
+          docker exec ubuntu apt-get install -y wget
+          docker exec ubuntu bash qbee-agent-installer.sh
+          docker kill ubuntu
 
       - name: Test install Debian
         run: |
-          docker run -d --name debian-arm --rm -v $(pwd):/app:ro -w /app debian:latest sleep 60
-          docker exec debian-arm apt-get update && apt-get install -y wget
-          docker exec debian-arm bash qbee-agent-installer.sh
-          docker kill debian-arm
+          docker run -d --name debian --rm -v $(pwd):/app:ro -w /app debian:latest sleep 60
+          docker exec debian apt-get update
+          docker exec debian apt-get install -y wget
+          docker exec debian bash qbee-agent-installer.sh
+          docker kill debian
 
       - name: Test install RHEL
         run: |
-          docker run -d --name rhel-arm --rm -v $(pwd):/app:ro -w /app registry.access.redhat.com/ubi9/ubi:latest sleep 60
-          docker exec rhel-arm bash qbee-agent-installer.sh
-          docker kill rhel-arm
+          docker run -d --name rhel --rm -v $(pwd):/app:ro -w /app registry.access.redhat.com/ubi9/ubi:latest sleep 60
+          docker exec rhel bash qbee-agent-installer.sh
+          docker kill rhel
 
       - name: Test install CentOS
         run: |
-          docker run -d --name centos7-arm --rm -v $(pwd):/app:ro -w /app centos:7 sleep 60
-          docker exec centos7-arm sh -c "sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/CentOS-*.repo"
-          docker exec centos7-arm sh -c "sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/CentOS-*.repo"
-          docker exec centos7-arm sh -c "sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/CentOS-*.repo"
-          docker exec centos7-arm bash qbee-agent-installer.sh
-          docker kill centos7-arm
+          docker run -d --name centos7 --rm -v $(pwd):/app:ro -w /app centos:7 sleep 60
+          
+          docker exec centos7 sh -c "sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/CentOS-*.repo"
+          docker exec centos7 sh -c "sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/CentOS-*.repo"
+          docker exec centos7 sh -c "sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/CentOS-*.repo"
+          docker exec centos7 bash qbee-agent-installer.sh
+
+          docker kill centos7
 
