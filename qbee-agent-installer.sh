@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2024 qbee.io
+# Copyright 2025 qbee.io
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,51 +16,53 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-## Some environment setup
-set -e
-export DEBIAN_FRONTEND=noninteractive
+# --- Setup environment ---
+set -euo pipefail
 
-QBEE_DEVICE_HUB_HOST=${QBEE_DEVICE_HUB_HOST:-device.app.qbee.io}
-QBEE_DEVICE_HUB_PORT=${QBEE_DEVICE_HUB_PORT:-}
-QBEE_DEVICE_VPN_SERVER=${QBEE_DEVICE_VPN_SERVER:-vpn.app.qbee.io}
-QBEE_DEVICE_CA_CERT=${QBEE_DEVICE_CA_CERT:-}
+REPO="qbee-io/qbee-agent"
+API="https://api.github.com/repos/$REPO/releases/latest"
+WORKDIR="${TMPDIR:-/tmp}/qbee-agent-install.$$"
 
-URL_BASE="https://cdn.qbee.io/software/qbee-agent"
-REMOTE_ACCESS_VERSION="1"
+die() { echo "Error: $*" >&2; exit 1; }
+info(){ echo "==> $*"; }
+cleanup(){ [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; }
+trap cleanup EXIT INT TERM
 
+# --- Check whether we have wget or curl ---
+if [[ -n $(command -v wget) ]]; then
+  GET="wget -qO-"
+elif [[ -n $(command -v curl) ]]; then
+  GET="curl -sSL"
+else
+  die "No suitable download tool found. Please install curl or wget and try again."
+fi
+
+# --- Check whether we are running as root ---
+if [[ $(whoami) != "root" ]]; then
+    die "This should only be run as root"
+fi
+
+# --- Switch to workdir ---
+mkdir -p "$WORKDIR" || die "Cannot create temp dir"
+info "Switching to workdir: $WORKDIR"
+cd $WORKDIR
+
+# --- Detect command line options ----
 usage() {
-  echo "Installer for qbee-agent packages (versions 2023.XX and later)"
-  echo "Usage: qbee-agent-installer.sh [OPTIONS]                      "
-  echo "                                                              "
-  echo "Valid OPTIONS are:                                            "
-  echo " --bootstrap-key <bootstrap_key>                              "
-  echo " --qbee-agent-version <qbee_agent_version> (default: latest)  "
-  echo " --ca-cert <path_to_ca_cert> (optional)                            "
-  echo " --device-hub-host <device_hub_host> (optional)               "
-  echo " --device-hub-port <device_hub_port> (optional)               "
+  echo "Installer for the latest qbee-agent package"
+  echo "Usage: qbee-agent-installer.sh [OPTIONS]"
+  echo ""
+  echo "Valid OPTIONS are:"
+  echo " --bootstrap-key <bootstrap_key>"
 }
+
+QBEE_BOOTSTRAP_KEY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --qbee-agent-version)
-      shift
-      QBEE_AGENT_VERSION=$1
-      ;;
     --bootstrap-key)
       shift
       QBEE_BOOTSTRAP_KEY=$1
-      ;;
-    --ca-cert)
-      shift
-      QBEE_DEVICE_CA_CERT=$1
-      ;;
-    --device-hub-host)
-      shift
-      QBEE_DEVICE_HUB_HOST=$1
-      ;;
-    --device-hub-port)
-      shift
-      QBEE_DEVICE_HUB_PORT=$1
       ;;
     --help)
       usage
@@ -74,174 +76,98 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+# --- Resolve qbee agent version ---
+JSON="$($GET "$API")" || die "Failed to query latest release"
+TAG="$(printf '%s\n' "$JSON" | awk -F'"' '/"tag_name"[[:space:]]*:/ {print $4; exit}')"
+
+case $TAG in
+  *.*.*) PKG_VERSION="$TAG" ;;
+  *.*)   PKG_VERSION="${TAG}.0" ;;
+  *)     die "Unexpected tag format: $TAG" ;;
+esac
+
+info "Detected release: $TAG"
+
+# --- Detect package manager and architecture ---
+if [[ -n $(command -v dpkg) ]]; then
+  PACKAGE_MANAGER="dpkg"
+
+  PACKAGE_ARCHITECTURE=$(dpkg --print-architecture)
+  case $PACKAGE_ARCHITECTURE in
+    amd64|arm64|armhf|mips64el|riscv64) info "Detected architecture: $PACKAGE_ARCHITECTURE" ;;
+    *) die "Unsupported architecture: $PACKAGE_ARCHITECTURE" ;;
+  esac
+
+  export DEBIAN_FRONTEND=noninteractive
+
+  PACKAGE_FILE="qbee-agent_${PKG_VERSION}_${PACKAGE_ARCHITECTURE}.deb"
+
+  INSTALL_CMD="dpkg -i"
+
+elif [[ -n $(command -v rpm) ]]; then
+  PACKAGE_MANAGER="rpm"
+
+  PACKAGE_ARCHITECTURE=$(rpm --eval '%{_arch}')
+  case $PACKAGE_ARCHITECTURE in
+    x86_64|aarch64|armv7hl|mips64el|riscv64) info "Detected architecture: $PACKAGE_ARCHITECTURE" ;;
+    *) die "Unsupported architecture: $PACKAGE_ARCHITECTURE" ;;
+  esac
+
+  PACKAGE_FILE="qbee-agent-${PKG_VERSION}-1.${PACKAGE_ARCHITECTURE}.rpm"
+
+  INSTALL_CMD="rpm -iU"
+
+else
+  die "No supported package manager found, exiting."
+fi   
+
+info "Detected package manager: $PACKAGE_MANAGER"
+
+# --- Download package ---
+DOWNLOAD_BASE_URL="https://github.com/$REPO/releases/download/$TAG"
+CHECKSUM_URL="$DOWNLOAD_BASE_URL/checksums.txt"
+PACKAGE_URL="$DOWNLOAD_BASE_URL/${PACKAGE_FILE}"
+
+info "Downloading checksums: $CHECKSUM_URL"
+$GET $CHECKSUM_URL > checksums.txt || die "Failed to download checksums"
+
+info "Downloading package: $PACKAGE_URL"
+$GET $PACKAGE_URL > $PACKAGE_FILE || die "Failed to download package $PACKAGE_FILE"
+
+# --- Verify checksum ---
+PKG_CHECKSUM=$(grep "$PACKAGE_FILE" checksums.txt)
+
+info "Verifying checksum $PKG_CHECKSUM"
+echo "$PKG_CHECKSUM" | sha256sum -c - || die "Checksum verification failed"
+
+# --- Install package ---
+
+info "Installing $PACKAGE_FILE"
+
+$INSTALL_CMD $PACKAGE_FILE
+
+# --- Bootstrap device ---
 if [[ -z $QBEE_BOOTSTRAP_KEY ]]; then
-  echo "WARNING: No bootstrap key provided, will only install"
+  info "No bootstrap key provided."
+  info "Use 'qbee-agent bootstrap -k <bootstrap-key>' command to bootstrap."
+  exit 0
 fi
 
-## We only want to run as root
-root_check() {
-  if [[ $(whoami) != "root" ]]; then
-    echo "This should only be run as root"
-    exit 1
-  fi
-}
+if [[ -f /etc/qbee/qbee-agent.json ]]; then
+  info "Agent already bootstrapped, skipping."
+else
+  info "Bootstrapping agent with key: $QBEE_BOOTSTRAP_KEY"
+  qbee-agent bootstrap -k "$QBEE_BOOTSTRAP_KEY" || die "Failed to bootstrap agent"
+fi
 
-root_check
-
-# determine the package manager
-detect_package_manager() {
-  if [[ -n $(command -v dpkg) ]]; then
-    PACKAGE_MANAGER="dpkg"
-  elif [[ -n $(command -v rpm) ]]; then
-    PACKAGE_MANAGER="rpm"
+# --- Restart systemd service ---
+if [ -f '/proc/1/comm' ]; then
+  init_comm=$(cat /proc/1/comm)
+  if [ "$init_comm" = "systemd" ]; then
+    info "Restarting qbee-agent service"
+    systemctl --no-block restart qbee-agent
   else
-    echo "No supported package manager found, exiting."
-    exit 1
-  fi   
-}
-
-# determine the architecture
-find_package_architecture() {
-  if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    PACKAGE_ARCHITECTURE=$(dpkg --print-architecture)
-  elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    PACKAGE_ARCHITECTURE=$(rpm --eval '%{_arch}')
+    info "Not running systemd, please start the agent manually."
+    info "qbee-agent start"
   fi
-}
-
-# resolve qbee agent version
-resolve_qbee_agent_version() {
-  if [[ -z $QBEE_AGENT_VERSION ]]; then
-    QBEE_AGENT_VERSION=$(wget -O - -q https://cdn.qbee.io/software/qbee-agent/latest.txt)
-    echo "Latest agent version is $QBEE_AGENT_VERSION"
-  fi
-
-  MAJOR_VERSION=$(echo "$QBEE_AGENT_VERSION" | cut -d. -f1)
-  MINOR_VERSION=$(echo "$QBEE_AGENT_VERSION" | cut -d. -f2 | sed 's/^0*//')
-
-  if [[ "$MAJOR_VERSION" -le 1 ]]; then
-    echo "Agent version $QBEE_AGENT_VERSION is not supported, exiting."
-    exit 1
-  fi
-
-  # Versions from 2024.09 and upwards have new remote access
-  if [[ "$MAJOR_VERSION" -ge 2024 && "$MINOR_VERSION" -ge 9 ]]; then
-    REMOTE_ACCESS_VERSION="2"
-  fi
-}
-
-# construct the agent url
-get_qbee_agent_url() {
-
-  URL_BASE="${URL_BASE}/${QBEE_AGENT_VERSION}/packages"
-
-  if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    QBEE_AGENT_PKG="qbee-agent_${QBEE_AGENT_VERSION}_${PACKAGE_ARCHITECTURE}.deb"
-  elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    QBEE_AGENT_PKG="qbee-agent-${QBEE_AGENT_VERSION}-1.${PACKAGE_ARCHITECTURE}.rpm"
-  fi
-}
-
-# make sure we have wget so that we can download the agent
-install_wget () {
-  local wget_cmd
-  wget_cmd=$(command -v wget || true)
-  if [[ -n $wget_cmd ]]; then
-    return
-  fi
-
-  if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    apt-get update
-    apt-get install -y wget
-  elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    yum install -y wget
-  fi
-}
-
-# install the utilities for remote access v1
-install_utils_remote_access_v1_utils() {
-  if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    apt-get install -y iproute2 openssh-server
-  elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    yum install -y iproute openssh-server
-  fi
-}
-
-# install the agent
-install_qbee_agent() {
-  local old_wd
-  old_wd=$(pwd)
-
-  DOWNLOAD_DIR=$(mktemp -d /tmp/qbee-agent-download.XXXXXXXX)
-  wget -P "$DOWNLOAD_DIR" "${URL_BASE}/${QBEE_AGENT_PKG}"
-  wget -P "$DOWNLOAD_DIR" "${URL_BASE}/SHA512SUMS"
-
-  cd "$DOWNLOAD_DIR"
-  PACKAGE_SHA512SUM=$(grep "${QBEE_AGENT_PKG}$" SHA512SUMS)
-  echo "$PACKAGE_SHA512SUM" | sha512sum -c || exit 1
-
-  if [[ $PACKAGE_MANAGER == "dpkg" ]]; then
-    dpkg -i "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
-  elif [[ $PACKAGE_MANAGER == "rpm" ]]; then
-    rpm -iU "${DOWNLOAD_DIR}/${QBEE_AGENT_PKG}"
-  fi
-  rm "${DOWNLOAD_DIR}" -rf
-  cd "$old_wd"
-}
-
-# bootstrap the agent
-bootstrap_agent() {
-  if [[ -f /etc/qbee/qbee-agent.json ]]; then
-    echo "Agent already bootstrapped, skipping."
-    return
-  fi
-
-  EXTRA_OPTIONS=""
-
-  if [[ $REMOTE_ACCESS_VERSION -eq 1 ]]; then
-    EXTRA_OPTIONS="--vpn-server $QBEE_DEVICE_VPN_SERVER"
-  fi
-
-  if [[ -n $QBEE_DEVICE_CA_CERT ]]; then
-    EXTRA_OPTIONS="$EXTRA_OPTIONS --ca-cert $QBEE_DEVICE_CA_CERT"
-  fi
-
-  if [[ -n $QBEE_DEVICE_HUB_PORT ]]; then
-    EXTRA_OPTIONS="$EXTRA_OPTIONS --device-hub-port $QBEE_DEVICE_HUB_PORT"
-  fi
-
-  # We allow word splitting here as theese are command line arguments
-  # shellcheck disable=SC2086
-  qbee-agent bootstrap -k "${QBEE_BOOTSTRAP_KEY}" --device-hub-host "$QBEE_DEVICE_HUB_HOST" $EXTRA_OPTIONS
-}
-
-# restart the agent
-start_qbee_agent() {
-  if [ -f '/proc/1/comm' ]; then
-    init_comm=$(cat /proc/1/comm)
-    if [ "$init_comm" = "systemd" ]; then
-      systemctl --no-block restart qbee-agent
-    else
-      echo "Not running systemd, please start the agent manually."
-      echo " $ qbee-agent start"
-    fi
-  fi
-}
-
-detect_package_manager
-find_package_architecture
-install_wget
-resolve_qbee_agent_version
-
-if [[ $REMOTE_ACCESS_VERSION -eq 1 ]]; then
-  install_utils_remote_access_v1_utils
 fi
-
-get_qbee_agent_url
-install_qbee_agent
-
-# skip bootstrap if env variable set
-[[ -z $QBEE_BOOTSTRAP_KEY ]] && exit 0
-
-bootstrap_agent
-start_qbee_agent
