@@ -89,6 +89,8 @@ jobs:
   test-armhf:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Test install legacy raspbian (armhf)
         run: |
           docker run --privileged --rm tonistiigi/binfmt --install all
