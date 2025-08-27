@@ -78,7 +78,12 @@ done
 
 # --- Resolve qbee agent version ---
 JSON="$($GET "$API")" || die "Failed to query latest release"
-TAG="$(printf '%s\n' "$JSON" | awk -F'"' '/"tag_name"[[:space:]]*:/ {print $4; exit}')"
+# Try to use awk, but fall back to sed if awk is not available
+if [[ -n $(command -v awk) ]]; then
+  TAG="$(printf '%s\n' "$JSON" | grep -m1 '"tag_name"' | awk -F '"' '{print $4}')"
+else
+  TAG="$(printf '%s\n' "$JSON" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
+fi
 
 case $TAG in
   *.*.*) PKG_VERSION="$TAG" ;;
