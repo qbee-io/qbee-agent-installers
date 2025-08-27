@@ -47,13 +47,6 @@ jobs:
 
           docker kill centos7
 
-      - name: Test install legacy raspbian (armhf)
-        run: |
-          docker run --privileged --rm tonistiigi/binfmt --install all
-          docker run -d --name raspbian8 --rm -v $(pwd):/app:ro -w /app raspbian/jessie:041518 sleep 60
-          docker exec raspbian8 bash qbee-agent-installer.sh
-          docker kill raspbian8
-
   test-arm64:
     runs-on: ubuntu-24.04-arm
 
@@ -93,3 +86,12 @@ jobs:
 
           docker kill centos7
 
+  test-armhf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test install legacy raspbian (armhf)
+        run: |
+          docker run --privileged --rm tonistiigi/binfmt --install all
+          docker run -d --name raspbian8 --rm -v $(pwd):/app:ro -w /app raspbian/jessie:041518 sleep 60
+          docker exec raspbian8 bash qbee-agent-installer.sh
+          docker kill raspbian8
