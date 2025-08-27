@@ -91,8 +91,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Test install legacy raspbian (armhf)
+      - name: Test install legacy raspbian
         run: |
+          docker run --privileged --rm tonistiigi/binfmt --install all
           docker run --platform linux/arm/v7 -d --name raspbian8 --rm -v $(pwd):/app:ro -w /app raspbian/jessie:041518 sleep 60
           docker exec raspbian8 bash qbee-agent-installer.sh
           docker kill raspbian8
