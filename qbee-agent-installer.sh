@@ -29,9 +29,9 @@ cleanup(){ [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; }
 trap cleanup EXIT INT TERM
 
 # --- Check whether we have wget or curl ---
-if [[ -n $(command -v wget) ]]; then
+if command -v wget >/dev/null 2>&1; then
   GET="wget -qO-"
-elif [[ -n $(command -v curl) ]]; then
+elif command -v curl >/dev/null 2>&1; then
   GET="curl -sSL"
 else
   die "No suitable download tool found. Please install curl or wget and try again."
@@ -79,7 +79,7 @@ done
 # --- Resolve qbee agent version ---
 JSON="$($GET "$API")" || die "Failed to query latest release"
 # Try to use awk, but fall back to sed if awk is not available
-if [[ -n $(command -v awk) ]]; then
+if command -v awk >/dev/null 2>&1; then
   TAG="$(printf '%s\n' "$JSON" | grep -m1 '"tag_name"' | awk -F '"' '{print $4}')"
 else
   TAG="$(printf '%s\n' "$JSON" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
@@ -94,7 +94,7 @@ esac
 info "Detected release: $TAG"
 
 # --- Detect package manager and architecture ---
-if [[ -n $(command -v dpkg) ]]; then
+if command -v dpkg >/dev/null 2>&1; then
   PACKAGE_MANAGER="dpkg"
 
   PACKAGE_ARCHITECTURE=$(dpkg --print-architecture)
@@ -109,7 +109,7 @@ if [[ -n $(command -v dpkg) ]]; then
 
   INSTALL_CMD="dpkg -i"
 
-elif [[ -n $(command -v rpm) ]]; then
+elif command -v rpm >/dev/null 2>&1; then
   PACKAGE_MANAGER="rpm"
 
   PACKAGE_ARCHITECTURE=$(rpm --eval '%{_arch}')
