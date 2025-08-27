@@ -46,6 +46,12 @@ jobs:
           docker exec centos7 bash qbee-agent-installer.sh
 
           docker kill centos7
+          
+      - name: Test install legacy raspbian
+        run: |
+          docker run -d --name raspbian8 --rm -v $(pwd):/app:ro -w /app hypriot/rpi-raspbian:jessie sleep 60
+          docker exec raspbian8 bash qbee-agent-installer.sh
+          docker kill raspbian8
 
   test-arm64:
     runs-on: ubuntu-24.04-arm
