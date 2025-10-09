@@ -17,10 +17,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # --- Setup environment ---
-set -euo pipefail
+set -eu
 
 REPO="qbee-io/qbee-agent"
-API="https://api.github.com/repos/$REPO/releases/latest"
 WORKDIR="${TMPDIR:-/tmp}/qbee-agent-install.$$"
 
 die() { echo "Error: $*" >&2; exit 1; }
@@ -76,13 +75,22 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# --- Resolve qbee agent version ---
-JSON="$($GET "$API")" || die "Failed to query latest release"
-# Try to use awk, but fall back to sed if awk is not available
-if command -v awk >/dev/null 2>&1; then
-  TAG="$(printf '%s\n' "$JSON" | grep -m1 '"tag_name"' | awk -F '"' '{print $4}')"
-else
-  TAG="$(printf '%s\n' "$JSON" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
+# --- Determine download URLs ---
+DOWNLOAD_BASE_URL="https://github.com/$REPO/releases/latest/download"
+
+# --- Disable pipefail for version detection ---
+CHECKSUM_URL="$DOWNLOAD_BASE_URL/checksums.txt"
+
+info "Downloading latest checksums: $CHECKSUM_URL"
+$GET $CHECKSUM_URL > checksums.txt || die "Failed to download checksums"
+
+# --- Use parameter substitution to get version ---
+TAG="$(grep '.tar.gz.sbom.json$' checksums.txt)"
+TAG="${TAG##*qbee-agent-}"
+TAG="${TAG%%.tar.gz.sbom.json}"
+
+if [[ -z $TAG ]]; then
+  die "Failed to detect latest version from checksums"
 fi
 
 case $TAG in
@@ -129,12 +137,7 @@ fi
 info "Detected package manager: $PACKAGE_MANAGER"
 
 # --- Download package ---
-DOWNLOAD_BASE_URL="https://github.com/$REPO/releases/download/$TAG"
-CHECKSUM_URL="$DOWNLOAD_BASE_URL/checksums.txt"
 PACKAGE_URL="$DOWNLOAD_BASE_URL/${PACKAGE_FILE}"
-
-info "Downloading checksums: $CHECKSUM_URL"
-$GET $CHECKSUM_URL > checksums.txt || die "Failed to download checksums"
 
 info "Downloading package: $PACKAGE_URL"
 $GET $PACKAGE_URL > $PACKAGE_FILE || die "Failed to download package $PACKAGE_FILE"
