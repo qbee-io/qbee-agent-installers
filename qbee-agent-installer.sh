@@ -17,7 +17,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # --- Setup environment ---
-set -euo pipefail
+set -eu
 
 REPO="qbee-io/qbee-agent"
 API="https://api.github.com/repos/$REPO/releases/latest"
@@ -45,7 +45,7 @@ fi
 # --- Switch to workdir ---
 mkdir -p "$WORKDIR" || die "Cannot create temp dir"
 info "Switching to workdir: $WORKDIR"
-cd $WORKDIR
+cd "$WORKDIR"
 
 # --- Detect command line options ----
 usage() {
@@ -77,15 +77,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Resolve qbee agent version ---
-JSON="$($GET "$API")" || die "Failed to query latest release"
-# Try to use awk, but fall back to sed if awk is not available
-if command -v awk >/dev/null 2>&1; then
-  TAG="$(printf '%s\n' "$JSON" | grep -m1 '"tag_name"' | awk -F '"' '{print $4}')"
-else
-  TAG="$(printf '%s\n' "$JSON" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')"
-fi
+TAG=$($GET "$API" | grep '"tag_name":' | cut -d '"' -f 4) || die "Failed to query latest release"
 
-case $TAG in
+case "$TAG" in
   *.*.*) PKG_VERSION="$TAG" ;;
   *.*)   PKG_VERSION="${TAG}.0" ;;
   *)     die "Unexpected tag format: $TAG" ;;
@@ -134,10 +128,10 @@ CHECKSUM_URL="$DOWNLOAD_BASE_URL/checksums.txt"
 PACKAGE_URL="$DOWNLOAD_BASE_URL/${PACKAGE_FILE}"
 
 info "Downloading checksums: $CHECKSUM_URL"
-$GET $CHECKSUM_URL > checksums.txt || die "Failed to download checksums"
+$GET "$CHECKSUM_URL" > checksums.txt || die "Failed to download checksums"
 
 info "Downloading package: $PACKAGE_URL"
-$GET $PACKAGE_URL > $PACKAGE_FILE || die "Failed to download package $PACKAGE_FILE"
+$GET "$PACKAGE_URL" > "$PACKAGE_FILE" || die "Failed to download package $PACKAGE_FILE"
 
 # --- Verify checksum ---
 PKG_CHECKSUM=$(grep "$PACKAGE_FILE" checksums.txt)
@@ -149,7 +143,7 @@ echo "$PKG_CHECKSUM" | sha256sum -c - || die "Checksum verification failed"
 
 info "Installing $PACKAGE_FILE"
 
-$INSTALL_CMD $PACKAGE_FILE
+$INSTALL_CMD "$PACKAGE_FILE"
 
 # --- Bootstrap device ---
 if [[ -z $QBEE_BOOTSTRAP_KEY ]]; then
