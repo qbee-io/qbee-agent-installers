@@ -54,12 +54,18 @@ usage() {
   echo ""
   echo "Valid OPTIONS are:"
   echo " --bootstrap-key <bootstrap_key>"
+  echo " --qbee-agent-version <version>"
 }
 
 QBEE_BOOTSTRAP_KEY=""
+QBEE_AGENT_VERSION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --qbee-agent-version)
+      shift
+      QBEE_AGENT_VERSION=$1
+      ;;
     --bootstrap-key)
       shift
       QBEE_BOOTSTRAP_KEY=$1
@@ -76,16 +82,33 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# --- Resolve qbee agent version ---
-TAG=$($GET "$API" | grep '"tag_name":' | cut -d '"' -f 4) || die "Failed to query latest release"
+# --- Default values ---
+CHECKSUMS_FILE="checksums.txt"
+CHECKSUM_UTIL="sha256sum"
 
-case "$TAG" in
-  *.*.*) PKG_VERSION="$TAG" ;;
-  *.*)   PKG_VERSION="${TAG}.0" ;;
-  *)     die "Unexpected tag format: $TAG" ;;
-esac
+# --- Determine package version ---
+if [[ -z $QBEE_AGENT_VERSION ]]; then
+  info "No package version provided, using latest release."
+  TAG=$($GET "$API" | grep '"tag_name":' | cut -d '"' -f 4) || die "Failed to query latest release"
+else
+  # --- Clean up version string by removing trailing zeros ---
+  TAG="${QBEE_AGENT_VERSION%.0}"
+fi
 
-info "Detected release: $TAG"
+# --- extract major version ---
+MAJOR_VERSION="${TAG%%.*}"
+
+if (( MAJOR_VERSION < 2025 )); then
+  PKG_VERSION="$TAG"
+  CHECKSUMS_FILE="qbee-agent-$PKG_VERSION-SHA512SUMS"
+  CHECKSUM_UTIL="sha512sum"
+else
+  case "$TAG" in
+    *.*.*) PKG_VERSION="$TAG" ;;
+    *.*)   PKG_VERSION="${TAG}.0" ;;
+    *)     die "Unexpected tag format: $TAG" ;;
+  esac
+fi
 
 # --- Detect package manager and architecture ---
 if command -v dpkg >/dev/null 2>&1; then
@@ -124,7 +147,7 @@ info "Detected package manager: $PACKAGE_MANAGER"
 
 # --- Download package ---
 DOWNLOAD_BASE_URL="https://github.com/$REPO/releases/download/$TAG"
-CHECKSUM_URL="$DOWNLOAD_BASE_URL/checksums.txt"
+CHECKSUM_URL="$DOWNLOAD_BASE_URL/$CHECKSUMS_FILE"
 PACKAGE_URL="$DOWNLOAD_BASE_URL/${PACKAGE_FILE}"
 
 info "Downloading checksums: $CHECKSUM_URL"
@@ -137,7 +160,7 @@ $GET "$PACKAGE_URL" > "$PACKAGE_FILE" || die "Failed to download package $PACKAG
 PKG_CHECKSUM=$(grep "$PACKAGE_FILE" checksums.txt)
 
 info "Verifying checksum $PKG_CHECKSUM"
-echo "$PKG_CHECKSUM" | sha256sum -c - || die "Checksum verification failed"
+echo "$PKG_CHECKSUM" | $CHECKSUM_UTIL -c - || die "Checksum verification failed"
 
 # --- Install package ---
 
