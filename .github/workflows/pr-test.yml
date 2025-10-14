@@ -8,6 +8,30 @@ on:
       - main
 
 jobs:
+  test-versions:
+    strategy:
+      matrix:
+        version: [
+          "2023.44", "2023.46", "2024.05", "2024.06", "2024.09",
+          "2024.14", "2024.19", "2024.23", "2024.36", "2024.45",
+          "2024.50", "2025.36", "2025.36.0"
+          ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test install Ubuntu 
+        run: |
+          docker run -d --name ubuntu --rm -v $(pwd):/app:ro -w /app ubuntu:latest sleep 60
+          docker exec ubuntu apt-get update
+          docker exec ubuntu apt-get install -y wget
+          docker exec ubuntu bash qbee-agent-installer.sh --qbee-agent-version ${{ matrix.version }}
+          AGENT_VERSION="${{ matrix.version }}"
+          AGENT_VERSION="${AGENT_VERSION%.0}" # Remove trailing .0 if present
+          docker exec ubuntu qbee-agent version | grep "$AGENT_VERSION" || (echo "Version check failed" && exit 1)
+          docker kill ubuntu
+
   test-amd64:
     runs-on: ubuntu-latest
 
@@ -94,6 +118,6 @@ jobs:
       - name: Test install legacy raspbian
         run: |
           docker run --privileged --rm tonistiigi/binfmt --install all
-          docker run --platform linux/arm/v7 -d --name raspbian8 --rm -v $(pwd):/app:ro -w /app raspbian/jessie:041518 sleep 60
+          docker run --platform linux/arm/v7 -d --name raspbian8 --rm -v $(pwd):/app:ro -w /app raspbian/jessie:041518 sleep 600
           docker exec raspbian8 bash qbee-agent-installer.sh
           docker kill raspbian8

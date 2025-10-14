@@ -54,12 +54,18 @@ usage() {
   echo ""
   echo "Valid OPTIONS are:"
   echo " --bootstrap-key <bootstrap_key>"
+  echo " --qbee-agent-version <version>"
 }
 
 QBEE_BOOTSTRAP_KEY=""
+QBEE_AGENT_VERSION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --qbee-agent-version)
+      shift
+      QBEE_AGENT_VERSION=$1
+      ;;
     --bootstrap-key)
       shift
       QBEE_BOOTSTRAP_KEY=$1
@@ -76,16 +82,27 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# --- Resolve qbee agent version ---
-TAG=$($GET "$API" | grep '"tag_name":' | cut -d '"' -f 4) || die "Failed to query latest release"
+# --- Determine package version ---
+if [[ -z $QBEE_AGENT_VERSION ]]; then
+  info "No package version provided, using latest release."
+  TAG=$($GET "$API" | grep '"tag_name":' | cut -d '"' -f 4) || die "Failed to query latest release"
+else
+  # --- Remove trailing .0 if present ---
+  TAG="${QBEE_AGENT_VERSION%.0}"
+fi
 
-case "$TAG" in
-  *.*.*) PKG_VERSION="$TAG" ;;
-  *.*)   PKG_VERSION="${TAG}.0" ;;
-  *)     die "Unexpected tag format: $TAG" ;;
-esac
+# --- extract major version ---
+MAJOR_VERSION="${TAG%%.*}"
 
-info "Detected release: $TAG"
+if (( MAJOR_VERSION < 2025 )); then
+  PKG_VERSION="$TAG"
+else
+  case "$TAG" in
+    *.*.*) PKG_VERSION="$TAG" ;;
+    *.*)   PKG_VERSION="${TAG}.0" ;;
+    *)     die "Unexpected tag format: $TAG" ;;
+  esac
+fi
 
 # --- Detect package manager and architecture ---
 if command -v dpkg >/dev/null 2>&1; then
