@@ -87,7 +87,7 @@ if [[ -z $QBEE_AGENT_VERSION ]]; then
   info "No package version provided, using latest release."
   TAG=$($GET "$API" | grep '"tag_name":' | cut -d '"' -f 4) || die "Failed to query latest release"
 else
-  # --- Clean up version string by removing trailing zeros ---
+  # --- Remove trailing .0 if present ---
   TAG="${QBEE_AGENT_VERSION%.0}"
 fi
 
