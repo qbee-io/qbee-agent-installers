@@ -82,10 +82,6 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# --- Default values ---
-CHECKSUMS_FILE="checksums.txt"
-CHECKSUM_UTIL="sha256sum"
-
 # --- Determine package version ---
 if [[ -z $QBEE_AGENT_VERSION ]]; then
   info "No package version provided, using latest release."
@@ -100,8 +96,6 @@ MAJOR_VERSION="${TAG%%.*}"
 
 if (( MAJOR_VERSION < 2025 )); then
   PKG_VERSION="$TAG"
-  CHECKSUMS_FILE="qbee-agent-$PKG_VERSION-SHA512SUMS"
-  CHECKSUM_UTIL="sha512sum"
 else
   case "$TAG" in
     *.*.*) PKG_VERSION="$TAG" ;;
@@ -147,7 +141,7 @@ info "Detected package manager: $PACKAGE_MANAGER"
 
 # --- Download package ---
 DOWNLOAD_BASE_URL="https://github.com/$REPO/releases/download/$TAG"
-CHECKSUM_URL="$DOWNLOAD_BASE_URL/$CHECKSUMS_FILE"
+CHECKSUM_URL="$DOWNLOAD_BASE_URL/checksums.txt"
 PACKAGE_URL="$DOWNLOAD_BASE_URL/${PACKAGE_FILE}"
 
 info "Downloading checksums: $CHECKSUM_URL"
@@ -160,7 +154,7 @@ $GET "$PACKAGE_URL" > "$PACKAGE_FILE" || die "Failed to download package $PACKAG
 PKG_CHECKSUM=$(grep "$PACKAGE_FILE" checksums.txt)
 
 info "Verifying checksum $PKG_CHECKSUM"
-echo "$PKG_CHECKSUM" | $CHECKSUM_UTIL -c - || die "Checksum verification failed"
+echo "$PKG_CHECKSUM" | sha256sum -c - || die "Checksum verification failed"
 
 # --- Install package ---
 
