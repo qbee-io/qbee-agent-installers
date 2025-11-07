@@ -92,6 +92,8 @@ check_package_version() {
 check_dpkg_lock() {
   # disable pipefail for this particular test, or it will not work properly
   set +o pipefail
+
+  # shellcheck disable=SC2010
   if ls -lt /proc/[0-9]*/fd 2> /dev/null | grep -q /var/lib/dpkg/lock; then
     echo "ERROR: Package manager is already running, unable to upgrade" 
     exit 1
