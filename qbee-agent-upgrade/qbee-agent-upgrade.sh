@@ -31,6 +31,13 @@ if [[ ! -f "$1" ]]; then
   exit 1
 fi
 
+check_shell_not_terminal() {
+  if [[ -t 0 ]]; then
+    echo "ERROR: this script must not be run in a terminal, please read the documentation"
+    exit 1
+  fi
+}
+
 check_system_utilities() {
   if [[ ! -x "$(command -v mktemp)" ]]; then
     echo "ERROR: mktemp is required to run this script"
@@ -163,6 +170,7 @@ sanity_rpm() {
 dpkg_path=$(command -v dpkg || true)
 rpm_path=$(command -v rpm || true)
 
+check_shell_not_terminal
 check_system_utilities
 
 if [[ -n "${dpkg_path}" ]]; then
