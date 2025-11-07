@@ -45,23 +45,6 @@ check_system_utilities() {
   fi
 }
 
-check_agent_sanity() {
-  if [[ ! -f /etc/qbee/qbee-agent.json ]]; then
-    echo "ERROR: qbee-agent configuration file not found"
-    exit 1
-  fi
-
-  if [[ ! -f /etc/qbee/ppkeys/qbee.cert ]]; then
-    echo "ERROR: qbee-agent certificate not found"
-    exit 1
-  fi
-
-  if [[ ! -f /etc/qbee/ppkeys/qbee.key ]]; then
-    echo "ERROR: qbee-agent key not found"
-    exit 1
-  fi
-}
-
 check_package_name() {
   local pkg_name
   pkg_name="$1"
