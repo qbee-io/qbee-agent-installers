@@ -31,26 +31,16 @@ if [[ ! -f "$1" ]]; then
   exit 1
 fi
 
-check_system_utilities() {
-  if [[ ! -x "$(command -v mktemp)" ]]; then
-    echo "ERROR: mktemp is required to run this script"
+check_shell_not_terminal() {
+  if [[ -t 0 ]]; then
+    echo "ERROR: this script must not be run in a terminal, please read the documentation"
     exit 1
   fi
 }
 
-check_agent_sanity() {
-  if [[ ! -f /etc/qbee/qbee-agent.json ]]; then
-    echo "ERROR: qbee-agent configuration file not found"
-    exit 1
-  fi
-
-  if [[ ! -f /etc/qbee/ppkeys/qbee.cert ]]; then
-    echo "ERROR: qbee-agent certificate not found"
-    exit 1
-  fi
-
-  if [[ ! -f /etc/qbee/ppkeys/qbee.key ]]; then
-    echo "ERROR: qbee-agent key not found"
+check_system_utilities() {
+  if [[ ! -x "$(command -v mktemp)" ]]; then
+    echo "ERROR: mktemp is required to run this script"
     exit 1
   fi
 }
@@ -102,6 +92,8 @@ check_package_version() {
 check_dpkg_lock() {
   # disable pipefail for this particular test, or it will not work properly
   set +o pipefail
+
+  # shellcheck disable=SC2010
   if ls -lt /proc/[0-9]*/fd 2> /dev/null | grep -q /var/lib/dpkg/lock; then
     echo "ERROR: Package manager is already running, unable to upgrade" 
     exit 1
@@ -163,6 +155,7 @@ sanity_rpm() {
 dpkg_path=$(command -v dpkg || true)
 rpm_path=$(command -v rpm || true)
 
+check_shell_not_terminal
 check_system_utilities
 
 if [[ -n "${dpkg_path}" ]]; then
