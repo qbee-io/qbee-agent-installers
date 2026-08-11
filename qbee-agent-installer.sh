@@ -20,7 +20,7 @@
 set -eu
 
 REPO="qbee-io/qbee-agent"
-API="https://api.github.com/repos/$REPO/releases/latest"
+LATEST_TAG_URL="https://setup.qbee.io/latest.txt"
 WORKDIR="${TMPDIR:-/tmp}/qbee-agent-install.$$"
 
 die() { echo "Error: $*" >&2; exit 1; }
@@ -85,7 +85,7 @@ done
 # --- Determine package version ---
 if [[ -z $QBEE_AGENT_VERSION ]]; then
   info "No package version provided, using latest release."
-  TAG=$($GET "$API" | grep '"tag_name":' | cut -d '"' -f 4) || die "Failed to query latest release"
+  TAG="$($GET "$LATEST_TAG_URL")" || die "Failed to query latest release"
 else
   # --- Remove trailing .0 if present ---
   TAG="${QBEE_AGENT_VERSION%.0}"

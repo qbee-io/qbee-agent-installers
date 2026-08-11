@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: S3 Static Manifest generator using an existing S3 bucket
+
+Parameters:
+  ExistingBucketName:
+    Type: String
+    Description: Name of your existing S3 bucket (must allow public reads if accessed directly).
+  GitHubRepo:
+    Type: String
+    Default: 'qbee-io/qbee-agent'
+    Description: Target GitHub repository (owner/repo format).
+  GitHubToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: (Optional) Personal Access Token to increase GitHub API limits for Lambda.
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3WriteManifestPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub 'arn:aws:s3:::${ExistingBucketName}/*'
+
+  UpdateManifestLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          S3_BUCKET_NAME: !Ref ExistingBucketName
+          GITHUB_REPO: !Ref GitHubRepo
+          GITHUB_TOKEN: !Ref GitHubToken
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import urllib.request
+          import boto3
+
+          def handler(event, context):
+              bucket = os.environ['S3_BUCKET_NAME']
+              repo = os.environ['GITHUB_REPO']
+              token = os.environ.get('GITHUB_TOKEN')
+
+              url = f"https://api.github.com/repos/{repo}/releases/latest"
+              req = urllib.request.Request(url, headers={'User-Agent': 'AWS-Lambda-Manifest'})
+              
+              if token:
+                  req.add_header('Authorization', f'Bearer {token}')
+
+              with urllib.request.urlopen(req) as response:
+                  payload = json.loads(response.read().decode('utf-8'))
+
+              tag_name = payload.get('tag_name', '')
+
+              if not tag_name:
+                  raise ValueError("No tag_name found in the latest release payload")
+              
+              s3 = boto3.client('s3')
+              
+              # Write plain-text version string
+              s3.put_object(
+                  Bucket=bucket,
+                  Key='latest.txt',
+                  Body=tag_name,
+                  ContentType='text/plain'
+              )
+              
+              return {"statusCode": 200, "body": f"Updated version to {tag_name}"}
+
+  SchedulerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt UpdateManifestLambda.Arn
+
+  Scheduler:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      ScheduleExpression: "rate(5 minutes)"
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !GetAtt UpdateManifestLambda.Arn
+        RoleArn: !GetAtt SchedulerExecutionRole.Arn
