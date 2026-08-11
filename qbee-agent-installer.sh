@@ -85,11 +85,13 @@ done
 # --- Determine package version ---
 if [[ -z $QBEE_AGENT_VERSION ]]; then
   info "No package version provided, using latest release."
-  TAG="$($GET "$LATEST_TAG_URL")" || die "Failed to query latest release"
+  TAG="$($GET "$LATEST_TAG_URL" | tr -d '[:space:]')" || die "Failed to query latest release"
 else
   # --- Remove trailing .0 if present ---
   TAG="${QBEE_AGENT_VERSION%.0}"
 fi
+
+[[ -n "$TAG" ]] || die "Failed to determine package version"
 
 # --- extract major version ---
 MAJOR_VERSION="${TAG%%.*}"
