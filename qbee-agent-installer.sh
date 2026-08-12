@@ -26,7 +26,7 @@ API="https://api.github.com/repos/$REPO/releases/latest"
 
 die() { echo "Error: $*" >&2; exit 1; }
 info(){ echo "==> $*"; }
-WORKDIR=$(mktemp -d) || die "Cannot create secure temp dir"
+WORKDIR=$(mktemp -d "${TMPDIR:-/tmp}/qbee-agent-install.XXXXXX") || die "Cannot create secure temp dir"
 cleanup(){ [ -d "$WORKDIR" ] && rm -rf -- "$WORKDIR"; }
 trap cleanup EXIT INT TERM
 
