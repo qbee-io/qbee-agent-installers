@@ -19,13 +19,15 @@
 # --- Setup environment ---
 set -eu
 
+umask 077
+
 REPO="qbee-io/qbee-agent"
 API="https://api.github.com/repos/$REPO/releases/latest"
-WORKDIR="${TMPDIR:-/tmp}/qbee-agent-install.$$"
 
 die() { echo "Error: $*" >&2; exit 1; }
 info(){ echo "==> $*"; }
-cleanup(){ [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; }
+WORKDIR=$(mktemp -d) || die "Cannot create secure temp dir"
+cleanup(){ [ -d "$WORKDIR" ] && rm -rf -- "$WORKDIR"; }
 trap cleanup EXIT INT TERM
 
 # --- Check whether we have wget or curl ---
@@ -43,7 +45,6 @@ if [[ $(whoami) != "root" ]]; then
 fi
 
 # --- Switch to workdir ---
-mkdir -p "$WORKDIR" || die "Cannot create temp dir"
 info "Switching to workdir: $WORKDIR"
 cd "$WORKDIR"
 
